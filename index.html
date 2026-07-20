@@ -2353,6 +2353,56 @@
             ` : `
               <button class="btn btn-primary" onclick="App.exportCourseCatalog()">📚 Export Course Catalog to Excel</button>
             `}
+
+            <hr style="margin: 1.5rem 0; border: none; border-top: 1px solid #e0e0e0;">
+
+            <h3 style="margin-bottom: 0.5rem; font-size: 1rem; color: #005eb8;">📦 Complete Backup (All Data)</h3>
+            <p style="color: #666; margin-bottom: 1rem; font-size: 0.875rem;">
+              Download EVERYTHING: Schedule + Coordinators + Instructors + Catalog + Rules.<br>
+              <strong>Perfect for:</strong> Complete backups, sharing full setup with team, archiving.
+            </p>
+            <button class="btn btn-primary" onclick="App.exportAllData()">📦 Export Complete Backup</button>
+
+            <hr style="margin: 1.5rem 0; border: none; border-top: 1px solid #e0e0e0;">
+
+            <h3 style="margin-bottom: 0.5rem; font-size: 1rem; color: #005eb8;">⚙️ Rules & Setup Only (No Schedule)</h3>
+            <p style="color: #666; margin-bottom: 1rem; font-size: 0.875rem;">
+              Download Coordinators + Instructors + Catalog + Rules (NO schedule data).<br>
+              <strong>Perfect for:</strong> Setting up new team members, sharing team config without schedule.
+            </p>
+            <button class="btn btn-primary" onclick="App.exportRulesOnly()">⚙️ Export Rules & Setup</button>
+          </div>
+
+          <div class="card">
+            <h2>📦 Import All Data (Complete Restore)</h2>
+            <p style="color: #666; margin-bottom: 1rem;">Restore a complete backup file (includes schedule, coordinators, instructors, catalog, rules).</p>
+
+            <div style="background: #fee; border-left: 4px solid #ef4444; padding: 1rem; margin-bottom: 1rem; border-radius: 4px;">
+              <p style="color: #991b1b; font-size: 0.875rem; margin-bottom: 0.5rem;"><strong>⚠️ WARNING:</strong> This will REPLACE everything!</p>
+              <ul style="color: #991b1b; font-size: 0.875rem; padding-left: 1.5rem; margin: 0;">
+                <li>Your entire schedule</li>
+                <li>All coordinators</li>
+                <li>All instructors</li>
+                <li>Course catalog templates</li>
+                <li>Rules and blackout dates</li>
+              </ul>
+            </div>
+
+            <input type="file" id="fileInputAllData" accept=".xlsx,.xls" style="margin-bottom: 1rem;">
+            <button class="btn btn-primary" onclick="App.importAllData()">📦 Import Complete Backup</button>
+          </div>
+
+          <div class="card">
+            <h2>⚙️ Import Rules Only (Setup Data)</h2>
+            <p style="color: #666; margin-bottom: 1rem;">Import coordinators, instructors, catalog, and rules WITHOUT affecting your schedule.</p>
+
+            <div style="background: #f0f9ff; border-left: 4px solid #0284c7; padding: 1rem; margin-bottom: 1rem; border-radius: 4px;">
+              <p style="color: #0369a1; font-size: 0.875rem; margin-bottom: 0.5rem;"><strong>✓ Safe for Schedule:</strong> Your schedule will NOT be changed.</p>
+              <p style="color: #0369a1; font-size: 0.875rem;">This only updates team setup data (coordinators, instructors, catalog, rules).</p>
+            </div>
+
+            <input type="file" id="fileInputRulesOnly" accept=".xlsx,.xls" style="margin-bottom: 1rem;">
+            <button class="btn btn-primary" onclick="App.importRulesOnly()">⚙️ Import Rules & Setup</button>
           </div>
 
           <div class="card">
@@ -2722,6 +2772,448 @@
         XLSX.writeFile(wb, `AU_Course_Catalog_${timestamp}.xlsx`);
 
         alert(`✓ Exported ${data.length} course templates!\n\nFilename: AU_Course_Catalog_${timestamp}.xlsx\n\nSend this file to your schedule manager.`);
+      },
+
+      exportAllData() {
+        const wb = XLSX.utils.book_new();
+
+        // Sheet 1: Schedule
+        const scheduleData = this.state.schedule.map(course => {
+          const instructor = this.state.instructors.find(i => i.id === course.instructor);
+          const coordinator = this.state.coordinators.find(c => c.id === course.coordinator);
+          return {
+            '#': course.rowNumber || '',
+            'Home Course': course.homeCourse || '',
+            'Portfolio': course.portfolio || '',
+            'WBS': course.wbs || course.courseRef || '',
+            'PTS': course.pts || '',
+            'Event Name': course.courseTitle,
+            'Instructors': course.instructors || (instructor ? instructor.name : ''),
+            'Month': course.month || '',
+            'First Day': course.firstDay || '',
+            'Last Day': course.lastDay || '',
+            'FY': course.fy || 'FY27',
+            'Time(s)': course.times || '',
+            'Location': course.location || '',
+            'Scheduled': course.scheduled || course.locationCode || '',
+            'Primary Training Contact': course.primaryContact || (coordinator ? coordinator.name : ''),
+            'Special Instructions': course.specialInstructions || '',
+            'Duration': course.duration || '',
+            'FT/PT': course.ftpt || '',
+            'Load Planning': course.loadPlanningLeadUp || '',
+            'Lead Day Of': course.loadPlanningDayOf || '',
+            'Lead Post': course.loadPlanningPost || '',
+            'Load: Total for Training Contact': course.coordLoad || '',
+            'AU Staff Travel': course.auStaffTravel || '',
+            'S/T Travel': course.stTravel || '',
+            'Catering': course.catering || '',
+            'Vendor Cost': course.vendorCost || ''
+          };
+        });
+        const scheduleSheet = XLSX.utils.json_to_sheet(scheduleData);
+        XLSX.utils.book_append_sheet(wb, scheduleSheet, 'Schedule');
+
+        // Sheet 2: Coordinators
+        const coordinatorData = this.state.coordinators.map(coord => ({
+          'Name': coord.name,
+          'Type': coord.type,
+          'Monthly Capacity': coord.capacity
+        }));
+        const coordSheet = XLSX.utils.json_to_sheet(coordinatorData);
+        XLSX.utils.book_append_sheet(wb, coordSheet, 'Coordinators');
+
+        // Sheet 3: Instructors
+        const instructorData = this.state.instructors.map(inst => ({
+          'Name': inst.name,
+          'Department': inst.department,
+          'Monthly Capacity': inst.capacity || 40
+        }));
+        const instSheet = XLSX.utils.json_to_sheet(instructorData);
+        XLSX.utils.book_append_sheet(wb, instSheet, 'Instructors');
+
+        // Sheet 4: Course Catalog
+        const catalogData = this.state.courseCatalog.map(template => ({
+          'Instructor Name': template.instructorName || '',
+          'Preferred Coordinator': template.coordinatorName || '',
+          'WBS': template.wbs || template.courseRef || '',
+          'Event Name': template.courseTitle,
+          'Portfolio': template.portfolio || '',
+          'PTS': template.pts || '',
+          'Sessions Per Year': template.sessionsPerYear,
+          'Average Total Load': template.avgCoordLoad,
+          'Duration (days)': template.durationDays,
+          'FT/PT': template.ftpt || '',
+          'Load Planning Lead Up': template.loadPlanningLeadUp || '',
+          'Load Planning Day Of': template.loadPlanningDayOf || '',
+          'Load Planning Post': template.loadPlanningPost || '',
+          'Default Location': template.location || '',
+          'Preferred Months': template.preferredMonths || '',
+          'Notes': template.notes || ''
+        }));
+        const catalogSheet = XLSX.utils.json_to_sheet(catalogData);
+        XLSX.utils.book_append_sheet(wb, catalogSheet, 'Course Catalog');
+
+        // Sheet 5: Rules & Settings
+        const rulesData = [
+          { 'Setting': 'Load Reduction %', 'Value': this.state.rules.loadReductionPercent || 0 },
+          { 'Setting': '', 'Value': '' },
+          { 'Setting': 'Blackout Dates', 'Value': '' },
+        ];
+        this.state.rules.blackoutDates.forEach(bd => {
+          rulesData.push({
+            'Setting': `  ${bd.name}`,
+            'Value': `${bd.startDate} to ${bd.endDate}`
+          });
+        });
+        const rulesSheet = XLSX.utils.json_to_sheet(rulesData);
+        XLSX.utils.book_append_sheet(wb, rulesSheet, 'Rules');
+
+        const timestamp = new Date().toISOString().slice(0,10);
+        XLSX.writeFile(wb, `AU_Complete_Backup_${timestamp}.xlsx`);
+
+        alert(`✓ Exported Complete Backup!\n\n` +
+              `Includes:\n` +
+              `• ${scheduleData.length} courses\n` +
+              `• ${coordinatorData.length} coordinators\n` +
+              `• ${instructorData.length} instructors\n` +
+              `• ${catalogData.length} course templates\n` +
+              `• ${this.state.rules.blackoutDates.length} blackout dates\n\n` +
+              `Filename: AU_Complete_Backup_${timestamp}.xlsx`);
+      },
+
+      exportRulesOnly() {
+        const wb = XLSX.utils.book_new();
+
+        // Sheet 1: Coordinators
+        const coordinatorData = this.state.coordinators.map(coord => ({
+          'Name': coord.name,
+          'Type': coord.type,
+          'Monthly Capacity': coord.capacity
+        }));
+        const coordSheet = XLSX.utils.json_to_sheet(coordinatorData);
+        XLSX.utils.book_append_sheet(wb, coordSheet, 'Coordinators');
+
+        // Sheet 2: Instructors
+        const instructorData = this.state.instructors.map(inst => ({
+          'Name': inst.name,
+          'Department': inst.department,
+          'Monthly Capacity': inst.capacity || 40
+        }));
+        const instSheet = XLSX.utils.json_to_sheet(instructorData);
+        XLSX.utils.book_append_sheet(wb, instSheet, 'Instructors');
+
+        // Sheet 3: Course Catalog
+        const catalogData = this.state.courseCatalog.map(template => ({
+          'Instructor Name': template.instructorName || '',
+          'Preferred Coordinator': template.coordinatorName || '',
+          'WBS': template.wbs || template.courseRef || '',
+          'Event Name': template.courseTitle,
+          'Portfolio': template.portfolio || '',
+          'PTS': template.pts || '',
+          'Sessions Per Year': template.sessionsPerYear,
+          'Average Total Load': template.avgCoordLoad,
+          'Duration (days)': template.durationDays,
+          'FT/PT': template.ftpt || '',
+          'Load Planning Lead Up': template.loadPlanningLeadUp || '',
+          'Load Planning Day Of': template.loadPlanningDayOf || '',
+          'Load Planning Post': template.loadPlanningPost || '',
+          'Default Location': template.location || '',
+          'Preferred Months': template.preferredMonths || '',
+          'Notes': template.notes || ''
+        }));
+        const catalogSheet = XLSX.utils.json_to_sheet(catalogData);
+        XLSX.utils.book_append_sheet(wb, catalogSheet, 'Course Catalog');
+
+        // Sheet 4: Rules & Settings
+        const rulesData = [
+          { 'Setting': 'Load Reduction %', 'Value': this.state.rules.loadReductionPercent || 0 },
+          { 'Setting': '', 'Value': '' },
+          { 'Setting': 'Blackout Dates', 'Value': '' },
+        ];
+        this.state.rules.blackoutDates.forEach(bd => {
+          rulesData.push({
+            'Setting': `  ${bd.name}`,
+            'Value': `${bd.startDate} to ${bd.endDate}`
+          });
+        });
+        const rulesSheet = XLSX.utils.json_to_sheet(rulesData);
+        XLSX.utils.book_append_sheet(wb, rulesSheet, 'Rules');
+
+        const timestamp = new Date().toISOString().slice(0,10);
+        XLSX.writeFile(wb, `AU_Rules_Setup_${timestamp}.xlsx`);
+
+        alert(`✓ Exported Rules & Setup Data!\n\n` +
+              `Includes:\n` +
+              `• ${coordinatorData.length} coordinators\n` +
+              `• ${instructorData.length} instructors\n` +
+              `• ${catalogData.length} course templates\n` +
+              `• ${this.state.rules.blackoutDates.length} blackout dates\n\n` +
+              `Does NOT include schedule data.\n\n` +
+              `Filename: AU_Rules_Setup_${timestamp}.xlsx`);
+      },
+
+      importAllData() {
+        const fileInput = document.getElementById('fileInputAllData');
+        const file = fileInput.files[0];
+
+        if (!file) {
+          alert('Please select a file first');
+          return;
+        }
+
+        const confirmImport = confirm(
+          `⚠️ IMPORT ALL DATA\n\n` +
+          `This will REPLACE:\n` +
+          `• Your entire schedule\n` +
+          `• All coordinators\n` +
+          `• All instructors\n` +
+          `• Course catalog\n` +
+          `• Rules and blackout dates\n\n` +
+          `Click OK to proceed or Cancel to abort.`
+        );
+
+        if (!confirmImport) {
+          fileInput.value = '';
+          return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          try {
+            const data = new Uint8Array(e.target.result);
+            const workbook = XLSX.read(data, { type: 'array' });
+
+            let imported = {schedule: 0, coord: 0, inst: 0, catalog: 0};
+
+            // Import Coordinators
+            if (workbook.SheetNames.includes('Coordinators')) {
+              const coordSheet = workbook.Sheets['Coordinators'];
+              const coordData = XLSX.utils.sheet_to_json(coordSheet);
+              this.state.coordinators = coordData.map((row, idx) => ({
+                id: Date.now() + idx,
+                name: row['Name'] || row['name'],
+                type: row['Type'] || row['type'] || 'FT',
+                capacity: parseFloat(row['Monthly Capacity'] || row['capacity'] || 60)
+              }));
+              imported.coord = this.state.coordinators.length;
+            }
+
+            // Import Instructors
+            if (workbook.SheetNames.includes('Instructors')) {
+              const instSheet = workbook.Sheets['Instructors'];
+              const instData = XLSX.utils.sheet_to_json(instSheet);
+              this.state.instructors = instData.map((row, idx) => ({
+                id: Date.now() + idx + 1000,
+                name: row['Name'] || row['name'],
+                department: row['Department'] || row['department'] || '',
+                capacity: parseFloat(row['Monthly Capacity'] || row['capacity'] || 40)
+              }));
+              imported.inst = this.state.instructors.length;
+            }
+
+            // Import Course Catalog
+            if (workbook.SheetNames.includes('Course Catalog')) {
+              const catalogSheet = workbook.Sheets['Course Catalog'];
+              const catalogData = XLSX.utils.sheet_to_json(catalogSheet);
+              this.state.courseCatalog = catalogData.map((row, idx) => ({
+                id: Date.now() + idx + 2000,
+                instructorName: row['Instructor Name'] || '',
+                coordinatorName: row['Preferred Coordinator'] || '',
+                wbs: row['WBS'] || '',
+                courseRef: row['WBS'] || '',
+                courseTitle: row['Event Name'] || row['Event name'] || '',
+                portfolio: row['Portfolio'] || '',
+                pts: row['PTS'] || '',
+                sessionsPerYear: parseInt(row['Sessions Per Year'] || row['Sessions per year'] || 1),
+                avgCoordLoad: parseFloat(row['Average Total Load'] || row['Average total load'] || 6),
+                durationDays: parseInt(row['Duration (days)'] || row['Duration'] || 1),
+                ftpt: row['FT/PT'] || '',
+                loadPlanningLeadUp: row['Load Planning Lead Up'] || '',
+                loadPlanningDayOf: row['Load Planning Day Of'] || '',
+                loadPlanningPost: row['Load Planning Post'] || '',
+                location: row['Default Location'] || '',
+                preferredMonths: row['Preferred Months'] || '',
+                notes: row['Notes'] || ''
+              }));
+              imported.catalog = this.state.courseCatalog.length;
+            }
+
+            // Import Schedule (reuse existing logic)
+            if (workbook.SheetNames.includes('Schedule')) {
+              const scheduleSheet = workbook.Sheets['Schedule'];
+              const scheduleData = XLSX.utils.sheet_to_json(scheduleSheet);
+              this.processScheduleImportData(scheduleData, 'replace');
+              imported.schedule = this.state.schedule.length;
+            }
+
+            this.saveState();
+            alert(`✓ Successfully imported ALL data!\n\n` +
+                  `Imported:\n` +
+                  `• ${imported.schedule} courses\n` +
+                  `• ${imported.coord} coordinators\n` +
+                  `• ${imported.inst} instructors\n` +
+                  `• ${imported.catalog} catalog templates`);
+            this.switchTab('dashboard');
+
+          } catch (error) {
+            console.error('Import error:', error);
+            alert('Error importing file. Please check the format and try again.');
+          }
+
+          fileInput.value = '';
+        };
+
+        reader.readAsArrayBuffer(file);
+      },
+
+      importRulesOnly() {
+        const fileInput = document.getElementById('fileInputRulesOnly');
+        const file = fileInput.files[0];
+
+        if (!file) {
+          alert('Please select a file first');
+          return;
+        }
+
+        const confirmImport = confirm(
+          `⚠️ IMPORT RULES & SETUP DATA\n\n` +
+          `This will REPLACE:\n` +
+          `• All coordinators\n` +
+          `• All instructors\n` +
+          `• Course catalog\n` +
+          `• Rules and blackout dates\n\n` +
+          `Your schedule will NOT be affected.\n\n` +
+          `Click OK to proceed or Cancel to abort.`
+        );
+
+        if (!confirmImport) {
+          fileInput.value = '';
+          return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          try {
+            const data = new Uint8Array(e.target.result);
+            const workbook = XLSX.read(data, { type: 'array' });
+
+            let imported = {coord: 0, inst: 0, catalog: 0};
+
+            // Import Coordinators
+            if (workbook.SheetNames.includes('Coordinators')) {
+              const coordSheet = workbook.Sheets['Coordinators'];
+              const coordData = XLSX.utils.sheet_to_json(coordSheet);
+              this.state.coordinators = coordData.map((row, idx) => ({
+                id: Date.now() + idx,
+                name: row['Name'] || row['name'],
+                type: row['Type'] || row['type'] || 'FT',
+                capacity: parseFloat(row['Monthly Capacity'] || row['capacity'] || 60)
+              }));
+              imported.coord = this.state.coordinators.length;
+            }
+
+            // Import Instructors
+            if (workbook.SheetNames.includes('Instructors')) {
+              const instSheet = workbook.Sheets['Instructors'];
+              const instData = XLSX.utils.sheet_to_json(instSheet);
+              this.state.instructors = instData.map((row, idx) => ({
+                id: Date.now() + idx + 1000,
+                name: row['Name'] || row['name'],
+                department: row['Department'] || row['department'] || '',
+                capacity: parseFloat(row['Monthly Capacity'] || row['capacity'] || 40)
+              }));
+              imported.inst = this.state.instructors.length;
+            }
+
+            // Import Course Catalog
+            if (workbook.SheetNames.includes('Course Catalog')) {
+              const catalogSheet = workbook.Sheets['Course Catalog'];
+              const catalogData = XLSX.utils.sheet_to_json(catalogSheet);
+              this.state.courseCatalog = catalogData.map((row, idx) => ({
+                id: Date.now() + idx + 2000,
+                instructorName: row['Instructor Name'] || '',
+                coordinatorName: row['Preferred Coordinator'] || '',
+                wbs: row['WBS'] || '',
+                courseRef: row['WBS'] || '',
+                courseTitle: row['Event Name'] || row['Event name'] || '',
+                portfolio: row['Portfolio'] || '',
+                pts: row['PTS'] || '',
+                sessionsPerYear: parseInt(row['Sessions Per Year'] || row['Sessions per year'] || 1),
+                avgCoordLoad: parseFloat(row['Average Total Load'] || row['Average total load'] || 6),
+                durationDays: parseInt(row['Duration (days)'] || row['Duration'] || 1),
+                ftpt: row['FT/PT'] || '',
+                loadPlanningLeadUp: row['Load Planning Lead Up'] || '',
+                loadPlanningDayOf: row['Load Planning Day Of'] || '',
+                loadPlanningPost: row['Load Planning Post'] || '',
+                location: row['Default Location'] || '',
+                preferredMonths: row['Preferred Months'] || '',
+                notes: row['Notes'] || ''
+              }));
+              imported.catalog = this.state.courseCatalog.length;
+            }
+
+            this.saveState();
+            alert(`✓ Successfully imported rules & setup data!\n\n` +
+                  `Imported:\n` +
+                  `• ${imported.coord} coordinators\n` +
+                  `• ${imported.inst} instructors\n` +
+                  `• ${imported.catalog} catalog templates\n\n` +
+                  `Your schedule was NOT changed.`);
+            this.switchTab('people');
+
+          } catch (error) {
+            console.error('Import error:', error);
+            alert('Error importing file. Please check the format and try again.');
+          }
+
+          fileInput.value = '';
+        };
+
+        reader.readAsArrayBuffer(file);
+      },
+
+      processScheduleImportData(rows, mode) {
+        // Helper function to process schedule import
+        // This extracts the schedule import logic to be reusable
+        const courses = rows.map((row, index) => {
+          return {
+            id: Date.now() + index,
+            rowNumber: row['#'] || row['Row'] || '',
+            homeCourse: row['Home Course'] || row['Home course'] || '',
+            portfolio: row['Portfolio'] || '',
+            wbs: row['WBS'] || row['Course Ref'] || row['Course Reference'] || '',
+            courseRef: row['WBS'] || row['Course Ref'] || '',
+            pts: row['PTS'] || '',
+            courseTitle: row['Event Name'] || row['Course Title'] || row['Event name'] || row['Title'] || '',
+            instructors: row['Instructors'] || row['Instructor'] || '',
+            month: row['Month'] || '',
+            firstDay: row['First Day'] || row['Start Date'] || row['StartDate'] || '',
+            lastDay: row['Last Day'] || row['End Date'] || row['EndDate'] || '',
+            fy: row['FY'] || 'FY27',
+            times: row['Time(s)'] || row['Times'] || '',
+            location: row['Location'] || '',
+            scheduled: row['Scheduled'] || row['Location Code'] || row['Status'] || '',
+            locationCode: row['Scheduled'] || row['Location Code'] || '',
+            primaryContact: row['Primary Training Contact'] || row['Coordinator'] || row['Contact'] || '',
+            specialInstructions: row['Special Instructions'] || '',
+            duration: row['Duration'] || '',
+            ftpt: row['FT/PT'] || '',
+            loadPlanningLeadUp: row['Load Planning'] || row['Lead Up'] || '',
+            loadPlanningDayOf: row['Lead Day Of'] || row['Day Of'] || '',
+            loadPlanningPost: row['Lead Post'] || row['Post'] || '',
+            coordLoad: row['Load: Total for Training Contact'] || row['Coord Load'] || row['Load'] || row['Hours'] || '',
+            auStaffTravel: row['AU Staff Travel'] || '',
+            stTravel: row['S/T Travel'] || '',
+            catering: row['Catering'] || '',
+            vendorCost: row['Vendor Cost'] || ''
+          };
+        });
+
+        if (mode === 'replace') {
+          this.state.schedule = courses;
+        } else {
+          this.state.schedule = [...this.state.schedule, ...courses];
+        }
       },
 
       // Settings
