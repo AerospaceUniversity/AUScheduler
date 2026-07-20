@@ -2325,6 +2325,46 @@
           </div>
 
           <div class="card">
+            <h2>📥 Import Excel Schedule</h2>
+            <p style="color: #666; margin-bottom: 1rem;">Upload an Excel file (.xlsx) containing your training schedule.</p>
+
+            <div style="background: #fef3cd; border-left: 4px solid #f59e0b; padding: 1rem; margin-bottom: 1rem; border-radius: 4px;">
+              <p style="color: #92400e; font-size: 0.875rem; margin-bottom: 0.5rem;"><strong>⚠️ Warning:</strong> Choose your import mode carefully!</p>
+              <p style="color: #92400e; font-size: 0.875rem;">💡 Tip: Export your current schedule first as a backup!</p>
+            </div>
+
+            <p style="font-size: 0.875rem; color: #666; margin-bottom: 0.5rem;"><strong>Supported Column Names:</strong></p>
+            <ul style="font-size: 0.875rem; color: #666; margin-bottom: 1rem; padding-left: 1.5rem;">
+              <li><strong>Core Fields:</strong> WBS, Event Name, Instructors, Month, First Day, Last Day, FY</li>
+              <li><strong>Scheduling:</strong> Time(s), Location, Scheduled (status code)</li>
+              <li><strong>Contacts:</strong> Primary Training Contact</li>
+              <li><strong>Planning:</strong> Duration, FT/PT, Load Planning, Lead Day Of, Lead Post</li>
+              <li><strong>Load:</strong> Load: Total for Training Contact (or Coord Load)</li>
+              <li><strong>Costs:</strong> AU Staff Travel, S/T Travel, Catering, Vendor Cost</li>
+              <li><strong>Optional:</strong> Portfolio, PTS, Special Instructions</li>
+            </ul>
+            <p style="font-size: 0.875rem; color: #666; margin-bottom: 1rem;">
+              <strong>Note:</strong> The app will automatically map your Excel columns. Missing columns will be filled with defaults.
+            </p>
+
+            <input type="file" id="fileInput" accept=".xlsx,.xls" style="margin-bottom: 1rem;">
+
+            <div style="background: #f0f9ff; border: 1px solid #0284c7; padding: 1rem; border-radius: 4px; margin-bottom: 1rem;">
+              <p style="font-size: 0.875rem; font-weight: 600; color: #0369a1; margin-bottom: 0.5rem;">Import Mode:</p>
+              <label style="display: block; margin-bottom: 0.5rem; cursor: pointer;">
+                <input type="radio" name="importMode" value="replace" checked style="margin-right: 0.5rem;">
+                <strong>Replace All</strong> - Delete current schedule and import new data
+              </label>
+              <label style="display: block; cursor: pointer;">
+                <input type="radio" name="importMode" value="append" style="margin-right: 0.5rem;">
+                <strong>Append/Merge</strong> - Add to existing schedule (for consolidating multiple files)
+              </label>
+            </div>
+
+            <button class="btn btn-primary" onclick="App.importExcel()">📥 Import Excel File</button>
+          </div>
+
+          <div class="card">
             <h2>📤 Export Data</h2>
 
             <h3 style="margin-top: 1rem; margin-bottom: 0.5rem; font-size: 1rem; color: #005eb8;">Schedule (Courses)</h3>
