@@ -1,0 +1,3037 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AU Scheduler - Training Coordination Manager</title>
+
+  <!-- External Libraries - Local copies for SharePoint compatibility -->
+  <script src="dayjs.min.js"></script>
+  <script src="xlsx.full.min.js"></script>
+  <script src="chart.umd.min.js"></script>
+
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      background: #f5f5f5;
+      color: #333;
+    }
+
+    .app-container {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+    }
+
+    /* Header - Aero.org Colors */
+    .header {
+      background: linear-gradient(135deg, #005eb8 0%, #003d82 100%);
+      color: white;
+      padding: 1rem 2rem;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .header-left {
+      flex: 1;
+    }
+
+    .lock-indicator {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: rgba(255,255,255,0.15);
+      padding: 0.5rem 1rem;
+      border-radius: 4px;
+      font-size: 0.875rem;
+      white-space: nowrap;
+    }
+
+    .theme-toggle {
+      background: none;
+      border: none;
+      color: white;
+      font-size: 1.5rem;
+      cursor: pointer;
+      padding: 0.5rem;
+      transition: opacity 0.2s;
+      line-height: 1;
+    }
+
+    .theme-toggle:hover {
+      opacity: 0.8;
+    }
+
+    .header h1 {
+      font-size: 1.5rem;
+      font-weight: 600;
+    }
+
+    .header p {
+      font-size: 0.875rem;
+      opacity: 0.9;
+      margin-top: 0.25rem;
+    }
+
+    /* Ribbon Navigation */
+    .ribbon {
+      background: white;
+      border-bottom: 1px solid #e0e0e0;
+      display: flex;
+      padding: 0 2rem;
+      overflow-x: auto;
+    }
+
+    .ribbon-tab {
+      padding: 1rem 1.5rem;
+      background: none;
+      border: none;
+      border-bottom: 3px solid transparent;
+      cursor: pointer;
+      font-size: 0.875rem;
+      font-weight: 500;
+      color: #666;
+      transition: all 0.2s;
+      white-space: nowrap;
+    }
+
+    .ribbon-tab:hover {
+      color: #005eb8;
+      background: #f9f9f9;
+    }
+
+    .ribbon-tab.active {
+      color: #005eb8;
+      border-bottom-color: #005eb8;
+    }
+
+    /* Main Content Area */
+    .content-area {
+      flex: 1;
+      overflow: auto;
+      padding: 2rem;
+    }
+
+    /* Cards */
+    .card {
+      background: white;
+      border-radius: 8px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .card h2 {
+      font-size: 1.25rem;
+      margin-bottom: 1rem;
+      color: #333;
+    }
+
+    /* Stats Grid */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+
+    .stat-card {
+      background: white;
+      border-radius: 8px;
+      padding: 1.5rem;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+
+    .stat-label {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      color: #999;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+    }
+
+    .stat-value {
+      font-size: 2rem;
+      font-weight: 700;
+      color: #005eb8;
+      margin-top: 0.5rem;
+    }
+
+    /* Table Styles */
+    .data-table {
+      width: 100%;
+      min-width: 1800px; /* Force horizontal scroll for many columns */
+      border-collapse: collapse;
+      background: white;
+    }
+
+    .data-table th {
+      background: #f9f9f9;
+      padding: 0.75rem;
+      text-align: left;
+      font-weight: 600;
+      font-size: 0.875rem;
+      color: #666;
+      border-bottom: 2px solid #e0e0e0;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      white-space: nowrap;
+    }
+
+    .data-table td {
+      padding: 0.75rem;
+      border-bottom: 1px solid #f0f0f0;
+      font-size: 0.875rem;
+      white-space: nowrap;
+    }
+
+    /* Allow wrapping for specific columns */
+    .data-table td.wrap-text {
+      white-space: normal;
+      max-width: 300px;
+      word-wrap: break-word;
+    }
+
+    .data-table td.wrap-text-narrow {
+      white-space: normal;
+      max-width: 150px;
+      word-wrap: break-word;
+    }
+
+    .data-table tr:hover {
+      background: #f9f9f9;
+    }
+
+    /* Table container with horizontal scroll */
+    .table-scroll-container {
+      width: 100%;
+      overflow-x: auto;
+      overflow-y: auto;
+      max-height: calc(100vh - 300px);
+      border: 1px solid #e0e0e0;
+      border-radius: 4px;
+    }
+
+    /* Buttons */
+    .btn {
+      padding: 0.5rem 1rem;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.875rem;
+      font-weight: 500;
+      transition: all 0.2s;
+    }
+
+    .btn-primary {
+      background: #005eb8;
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background: #004a94;
+    }
+
+    .btn-secondary {
+      background: #e0e0e0;
+      color: #333;
+    }
+
+    .btn-secondary:hover {
+      background: #d0d0d0;
+    }
+
+    .btn-danger {
+      background: #ef4444;
+      color: white;
+    }
+
+    .btn-danger:hover {
+      background: #dc2626;
+    }
+
+    .btn-small {
+      padding: 0.25rem 0.5rem;
+      font-size: 0.75rem;
+    }
+
+    /* Drawer */
+    .drawer-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 1000;
+      display: none;
+    }
+
+    .drawer-overlay.open {
+      display: block;
+    }
+
+    .drawer-panel {
+      position: fixed;
+      right: 0;
+      top: 0;
+      bottom: 0;
+      width: 500px;
+      max-width: 90vw;
+      background: white;
+      box-shadow: -2px 0 8px rgba(0,0,0,0.2);
+      transform: translateX(100%);
+      transition: transform 0.3s ease;
+      display: flex;
+      flex-direction: column;
+      z-index: 1001;
+    }
+
+    .drawer-panel.open {
+      transform: translateX(0);
+    }
+
+    .drawer-header {
+      padding: 1.5rem;
+      border-bottom: 1px solid #e0e0e0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .drawer-header h2 {
+      font-size: 1.25rem;
+      margin: 0;
+    }
+
+    .drawer-close {
+      background: none;
+      border: none;
+      font-size: 1.5rem;
+      cursor: pointer;
+      color: #999;
+      padding: 0;
+      width: 32px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .drawer-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 1.5rem;
+    }
+
+    .drawer-footer {
+      padding: 1.5rem;
+      border-top: 1px solid #e0e0e0;
+      display: flex;
+      gap: 1rem;
+      justify-content: flex-end;
+    }
+
+    /* Form Elements */
+    .form-group {
+      margin-bottom: 1rem;
+    }
+
+    .form-label {
+      display: block;
+      font-size: 0.875rem;
+      font-weight: 500;
+      margin-bottom: 0.5rem;
+      color: #333;
+    }
+
+    .form-input,
+    .form-select {
+      width: 100%;
+      padding: 0.5rem;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 0.875rem;
+    }
+
+    .form-input:focus,
+    .form-select:focus {
+      outline: none;
+      border-color: #005eb8;
+      box-shadow: 0 0 0 3px rgba(102,126,234,0.1);
+    }
+
+    /* Warnings */
+    .warning-list {
+      list-style: none;
+    }
+
+    .warning-item {
+      padding: 1rem;
+      margin-bottom: 0.5rem;
+      border-radius: 4px;
+      font-size: 0.875rem;
+    }
+
+    .warning-high {
+      background: #fee;
+      border-left: 4px solid #ef4444;
+      color: #991b1b;
+    }
+
+    .warning-medium {
+      background: #fef3cd;
+      border-left: 4px solid #f59e0b;
+      color: #92400e;
+    }
+
+    /* Utility Classes */
+    .mb-1 { margin-bottom: 1rem; }
+    .mb-2 { margin-bottom: 2rem; }
+    .text-center { text-align: center; }
+    .hidden { display: none !important; }
+
+    /* Toolbar */
+    .toolbar {
+      display: flex;
+      gap: 1rem;
+      align-items: center;
+      margin-bottom: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .toolbar-spacer {
+      flex: 1;
+    }
+
+    /* Dark Mode Styles */
+    html.dark {
+      color-scheme: dark;
+    }
+
+    html.dark body {
+      background: #1a1a1a;
+      color: #e0e0e0;
+    }
+
+    html.dark .card {
+      background: #2a2a2a;
+      border-color: #3a3a3a;
+    }
+
+    html.dark .stat-card {
+      background: #2a2a2a;
+    }
+
+    html.dark .card h2,
+    html.dark .card h3 {
+      color: #e0e0e0;
+    }
+
+    html.dark .ribbon {
+      background: #2a2a2a;
+      border-bottom-color: #3a3a3a;
+    }
+
+    html.dark .ribbon-tab {
+      color: #999;
+    }
+
+    html.dark .ribbon-tab:hover {
+      color: #005eb8;
+      background: #1a1a1a;
+    }
+
+    html.dark .ribbon-tab.active {
+      color: #4a9eff;
+      border-bottom-color: #4a9eff;
+    }
+
+    html.dark .data-table {
+      background: #2a2a2a;
+    }
+
+    html.dark .data-table th {
+      background: #1a1a1a;
+      color: #999;
+      border-bottom-color: #3a3a3a;
+    }
+
+    html.dark .data-table td {
+      border-bottom-color: #3a3a3a;
+      color: #e0e0e0;
+    }
+
+    html.dark .data-table tr:hover {
+      background: #333;
+    }
+
+    html.dark .table-scroll-container {
+      border-color: #3a3a3a;
+    }
+
+    /* Sticky column backgrounds for dark mode */
+    html.dark .data-table th[style*="sticky"] {
+      background: #1a1a1a !important;
+    }
+
+    html.dark .data-table td[style*="sticky"] {
+      background: #2a2a2a !important;
+    }
+
+    html.dark .form-input,
+    html.dark .form-select {
+      background: #1a1a1a;
+      border-color: #3a3a3a;
+      color: #e0e0e0;
+    }
+
+    html.dark .drawer-panel {
+      background: #2a2a2a;
+    }
+
+    html.dark .drawer-header,
+    html.dark .drawer-footer {
+      border-color: #3a3a3a;
+    }
+
+    html.dark .drawer-header h2 {
+      color: #e0e0e0;
+    }
+
+    html.dark .form-label {
+      color: #e0e0e0;
+    }
+
+    html.dark .form-group p {
+      color: #999;
+    }
+
+    html.dark .drawer-close {
+      color: #999;
+    }
+
+    html.dark .drawer-close:hover {
+      color: #e0e0e0;
+    }
+
+    html.dark .btn-secondary {
+      background: #3a3a3a;
+      color: #e0e0e0;
+    }
+
+    html.dark .btn-secondary:hover {
+      background: #4a4a4a;
+    }
+  </style>
+</head>
+<body>
+  <div class="app-container">
+    <div class="header">
+      <div class="header-left">
+        <h1>🎓 AU Scheduler</h1>
+        <p>Aerospace University Training Coordination Manager</p>
+      </div>
+      <div class="lock-indicator" id="lockIndicator" style="display: none;">
+        <span>🔒 Schedule Locked</span>
+      </div>
+      <button class="theme-toggle" onclick="App.toggleTheme()" id="themeToggle" title="Toggle dark mode">
+        <span id="themeIcon">🌙</span>
+      </button>
+    </div>
+
+    <div class="ribbon" id="ribbon">
+      <!-- Tabs injected by JS -->
+    </div>
+
+    <div class="content-area" id="content">
+      <!-- Dynamic content loaded here -->
+    </div>
+  </div>
+
+  <!-- Drawer -->
+  <div class="drawer-overlay" id="drawerOverlay"></div>
+  <div class="drawer-panel" id="drawerPanel">
+    <!-- Drawer content injected by JS -->
+  </div>
+
+  <script>
+    // ============================================
+    // AU SCHEDULER - MAIN APPLICATION
+    // ============================================
+
+    const App = {
+      version: '1.0.0',
+
+      // Application State
+      state: {
+        schedule: [],
+        courseCatalog: [], // Template courses for auto-generation
+        instructors: [],
+        coordinators: [],
+        rules: {
+          globalReduction: 0.15, // 15% efficiency improvement
+          ftMultiplier: 1.0,
+          ptMultiplier: 1.2,
+          blackoutDates: [],
+          dependencies: [],
+          restrictions: []
+        },
+        capacities: {},
+        warnings: [],
+        settings: {
+          dateFormat: 'YYYY-MM-DD',
+          theme: 'light',
+          fiscalYearStart: '2027-10-01', // FY start date
+          scheduleLocked: false // Prevent accidental regeneration
+        },
+        meta: {
+          lastImport: null,
+          activeTab: 'dashboard'
+        }
+      },
+
+      // Initialize the application
+      init() {
+        console.log('AU Scheduler initializing...');
+
+        // Load saved state
+        this.loadState();
+
+        // Apply theme
+        this.applyTheme(this.state.settings.theme || 'light');
+
+        // Build UI
+        this.buildRibbon();
+        this.setupDrawer();
+
+        // Navigate to saved or default tab
+        this.switchTab(this.state.meta.activeTab || 'dashboard');
+
+        // Update lock indicator
+        this.updateLockIndicator();
+
+        console.log('AU Scheduler ready');
+      },
+
+      updateLockIndicator() {
+        const indicator = document.getElementById('lockIndicator');
+        if (indicator) {
+          indicator.style.display = this.state.settings.scheduleLocked ? 'flex' : 'none';
+        }
+      },
+
+      applyTheme(theme) {
+        this.state.settings.theme = theme;
+        const docClass = document.documentElement.classList;
+        const themeIcon = document.getElementById('themeIcon');
+
+        if (theme === 'dark') {
+          docClass.add('dark');
+          if (themeIcon) themeIcon.textContent = '☀️';
+        } else {
+          docClass.remove('dark');
+          if (themeIcon) themeIcon.textContent = '🌙';
+        }
+        this.saveState();
+      },
+
+      toggleTheme() {
+        const newTheme = this.state.settings.theme === 'dark' ? 'light' : 'dark';
+        this.applyTheme(newTheme);
+      },
+
+      // State Management
+      loadState() {
+        try {
+          const saved = localStorage.getItem('auScheduler.state');
+          if (saved) {
+            const parsed = JSON.parse(saved);
+            this.state = { ...this.state, ...parsed };
+            console.log('State loaded from localStorage');
+          } else {
+            // Initialize with sample data
+            this.initializeSampleData();
+          }
+        } catch (err) {
+          console.error('Failed to load state:', err);
+          this.initializeSampleData();
+        }
+      },
+
+      saveState() {
+        try {
+          localStorage.setItem('auScheduler.state', JSON.stringify(this.state));
+        } catch (err) {
+          console.error('Failed to save state:', err);
+        }
+      },
+
+      resetState() {
+        const confirmed = confirm(
+          '⚠️⚠️⚠️ FINAL WARNING ⚠️⚠️⚠️\n\n' +
+          'You are about to DELETE EVERYTHING:\n\n' +
+          '• All scheduled courses\n' +
+          '• All coordinators and instructors\n' +
+          '• All course catalog templates\n' +
+          '• All rules (blackout dates, dependencies, restrictions)\n' +
+          '• All settings and preferences\n\n' +
+          'This action CANNOT be undone!\n\n' +
+          'Have you exported your data as a backup?\n\n' +
+          'Type YES in your mind if you really want to proceed, then click OK.'
+        );
+
+        if (confirmed) {
+          const doubleCheck = confirm(
+            'Are you ABSOLUTELY SURE?\n\n' +
+            'This is your last chance to cancel.\n\n' +
+            'Click OK to permanently delete everything.'
+          );
+
+          if (doubleCheck) {
+            localStorage.removeItem('auScheduler.state');
+            alert('All data has been reset. Reloading application...');
+            location.reload();
+          }
+        }
+      },
+
+      clearScheduleOnly() {
+        if (this.state.schedule.length === 0) {
+          alert('Schedule is already empty.');
+          return;
+        }
+
+        const confirmed = confirm(
+          `Clear Schedule Only?\n\n` +
+          `This will remove all ${this.state.schedule.length} scheduled courses.\n\n` +
+          `The following will be PRESERVED:\n` +
+          `• Coordinators and instructors\n` +
+          `• Course catalog templates\n` +
+          `• All rules and settings\n\n` +
+          `Continue?`
+        );
+
+        if (confirmed) {
+          this.state.schedule = [];
+          this.state.warnings = [];
+          this.saveState();
+          alert(`Schedule cleared! ${this.state.coordinators.length} coordinators, ${this.state.instructors.length} instructors, and ${this.state.courseCatalog.length} catalog templates preserved.`);
+          this.switchTab('dashboard');
+        }
+      },
+
+      // Initialize with sample data
+      initializeSampleData() {
+        this.state.instructors = [
+          { id: 'inst1', name: 'John Smith', department: 'Engineering', capacity: 40 },
+          { id: 'inst2', name: 'Jane Doe', department: 'Science', capacity: 40 },
+          { id: 'inst3', name: 'Bob Wilson', department: 'Math', capacity: 40 }
+        ];
+
+        this.state.coordinators = [
+          { id: 'coord1', name: 'Training Specialist 1', type: 'FT', capacity: 60 },
+          { id: 'coord2', name: 'Training Specialist 2', type: 'FT', capacity: 60 },
+          { id: 'coord3', name: 'Training Specialist 3', type: 'FT', capacity: 60 },
+          { id: 'admin1', name: 'Admin Pool', type: 'PT', capacity: 20 }
+        ];
+
+        this.state.schedule = [
+          {
+            id: this.uuid(),
+            rowNumber: 1,
+            homeCourse: 'N',
+            portfolio: 'ST',
+            wbs: 'D-AA13150.0104',
+            pts: '10',
+            courseRef: 'AE101',
+            courseTitle: 'Introduction to Aerospace',
+            instructor: 'inst1',
+            instructors: 'John Smith', // Full names for display
+            coordinator: 'coord1',
+            month: 'OCT',
+            firstDay: 1,
+            lastDay: 15,
+            startDate: '2027-10-01',
+            endDate: '2027-10-15',
+            fy: 'FY27',
+            times: '10:00 AM - 12:00 PM (PT)',
+            location: 'Teams',
+            locationCode: 'N',
+            scheduled: 'N',
+            primaryContact: 'Stephanie',
+            specialInstructions: '',
+            duration: 2.0,
+            ftpt: 'PT',
+            loadPlanningLeadUp: 0.5,
+            loadPlanningDayOf: 1.0,
+            loadPlanningPost: 0.5,
+            coordLoad: 2.0,
+            auStaffTravel: 0,
+            stTravel: 0,
+            catering: 0,
+            vendorCost: 0,
+            status: 'Scheduled'
+          }
+        ];
+
+        // Initialize capacities for upcoming months
+        const months = this.getUpcomingMonths(12);
+        months.forEach(month => {
+          this.state.coordinators.forEach(coord => {
+            const key = `${coord.id}_${month}`;
+            this.state.capacities[key] = coord.capacity;
+          });
+        });
+      },
+
+      // UI Building
+      buildRibbon() {
+        const tabs = [
+          { id: 'dashboard', label: 'Dashboard' },
+          { id: 'schedule', label: 'Schedule' },
+          { id: 'catalog', label: 'Course Catalog' },
+          { id: 'people', label: 'People' },
+          { id: 'rules', label: 'Rules' },
+          { id: 'import', label: 'Import/Export' },
+          { id: 'settings', label: 'Settings' }
+        ];
+
+        const ribbon = document.getElementById('ribbon');
+        ribbon.innerHTML = tabs.map(tab => `
+          <button class="ribbon-tab" data-tab="${tab.id}">${tab.label}</button>
+        `).join('');
+
+        // Attach click handlers
+        ribbon.querySelectorAll('.ribbon-tab').forEach(btn => {
+          btn.addEventListener('click', () => {
+            this.switchTab(btn.dataset.tab);
+          });
+        });
+      },
+
+      switchTab(tabId) {
+        // Update active tab
+        document.querySelectorAll('.ribbon-tab').forEach(btn => {
+          btn.classList.toggle('active', btn.dataset.tab === tabId);
+        });
+
+        // Save active tab
+        this.state.meta.activeTab = tabId;
+        this.saveState();
+
+        // Render content
+        const renderers = {
+          dashboard: () => this.renderDashboard(),
+          schedule: () => this.renderSchedule(),
+          catalog: () => this.renderCourseCatalog(),
+          people: () => this.renderPeople(),
+          rules: () => this.renderRules(),
+          import: () => this.renderImportExport(),
+          settings: () => this.renderSettings()
+        };
+
+        if (renderers[tabId]) {
+          renderers[tabId]();
+        }
+      },
+
+      // Dashboard Rendering
+      renderDashboard() {
+        const content = document.getElementById('content');
+
+        // Run rules engine
+        this.runRulesEngine();
+
+        // Calculate stats
+        const totalCourses = this.state.schedule.length;
+        const totalLoad = this.state.schedule.reduce((sum, course) => sum + (course.coordLoad || 0), 0);
+        const totalCapacity = Object.values(this.state.capacities).reduce((sum, cap) => sum + cap, 0);
+        const warnings = this.state.warnings;
+
+        content.innerHTML = `
+          <div class="stats-grid">
+            <div class="stat-card">
+              <div class="stat-label">Total Courses</div>
+              <div class="stat-value">${totalCourses}</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">Total Coord Load (hrs)</div>
+              <div class="stat-value">${totalLoad}</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">Monthly Capacity (hrs)</div>
+              <div class="stat-value">${this.state.coordinators.reduce((sum, c) => sum + c.capacity, 0)}</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">Warnings</div>
+              <div class="stat-value" style="color: ${warnings.length > 0 ? '#ef4444' : '#10b981'}">${warnings.length}</div>
+            </div>
+          </div>
+
+          <div class="card">
+            <h2>⚠️ Warnings & Alerts</h2>
+            ${warnings.length === 0 ? `
+              <p style="color: #10b981; text-align: center; padding: 2rem;">
+                ✓ No conflicts detected. All coordinators are within capacity.
+              </p>
+            ` : `
+              <ul class="warning-list">
+                ${warnings.map(w => `
+                  <li class="warning-item warning-${w.severity}">
+                    <strong>${w.type}:</strong> ${w.message}
+                  </li>
+                `).join('')}
+              </ul>
+            `}
+          </div>
+
+          <div class="card">
+            <h2>📊 Coordinator Load Distribution</h2>
+            <canvas id="loadChart" style="max-height: 300px;"></canvas>
+          </div>
+        `;
+
+        // Render chart
+        this.renderLoadChart();
+      },
+
+      renderLoadChart() {
+        const ctx = document.getElementById('loadChart');
+        if (!ctx) return;
+
+        // Calculate loads per coordinator
+        const coordLoads = {};
+        this.state.coordinators.forEach(coord => {
+          coordLoads[coord.name] = 0;
+        });
+
+        this.state.schedule.forEach(course => {
+          const coord = this.state.coordinators.find(c => c.id === course.coordinator);
+          if (coord) {
+            coordLoads[coord.name] = (coordLoads[coord.name] || 0) + (course.coordLoad || 0);
+          }
+        });
+
+        const labels = Object.keys(coordLoads);
+        const data = Object.values(coordLoads);
+        const capacities = labels.map(name => {
+          const coord = this.state.coordinators.find(c => c.name === name);
+          return coord ? coord.capacity : 0;
+        });
+
+        new Chart(ctx, {
+          type: 'bar',
+          data: {
+            labels: labels,
+            datasets: [
+              {
+                label: 'Current Load (hrs)',
+                data: data,
+                backgroundColor: 'rgba(102, 126, 234, 0.8)'
+              },
+              {
+                label: 'Monthly Capacity (hrs)',
+                data: capacities,
+                backgroundColor: 'rgba(200, 200, 200, 0.5)'
+              }
+            ]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            scales: {
+              y: {
+                beginAtZero: true
+              }
+            }
+          }
+        });
+      },
+
+      // Schedule Rendering
+      renderSchedule() {
+        const content = document.getElementById('content');
+
+        // Check if data was imported and show debug info
+        const lastImport = this.state.meta.lastImportName;
+        const sampleCourse = this.state.schedule[0];
+        let debugPanel = '';
+
+        if (lastImport && sampleCourse) {
+          const fieldsWithData = Object.entries(sampleCourse)
+            .filter(([key, value]) => value && value !== '' && !['id', 'instructor', 'coordinator', 'status'].includes(key))
+            .map(([key]) => key);
+
+          debugPanel = `
+            <div class="card" style="background: #f0f9ff; border: 2px solid #0284c7; margin-bottom: 1rem;">
+              <h3 style="color: #0369a1; font-size: 0.875rem; margin-bottom: 0.5rem;">📋 Import Debug Info</h3>
+              <p style="font-size: 0.75rem; color: #0c4a6e; margin-bottom: 0.25rem;"><strong>Last Import:</strong> ${lastImport}</p>
+              <p style="font-size: 0.75rem; color: #0c4a6e; margin-bottom: 0.25rem;"><strong>Courses Loaded:</strong> ${this.state.schedule.length}</p>
+              <p style="font-size: 0.75rem; color: #0c4a6e;"><strong>Fields with Data:</strong> ${fieldsWithData.join(', ') || 'None detected - check console (F12)'}</p>
+              <button class="btn btn-secondary btn-small" onclick="console.log('Sample Course:', App.state.schedule[0]); alert('Check browser console (F12) for full course data');" style="margin-top: 0.5rem;">View Sample Course in Console</button>
+            </div>
+          `;
+        }
+
+        content.innerHTML = `
+          ${debugPanel}
+          <div class="card">
+            <div class="toolbar">
+              <h2 style="margin: 0;">📅 Training Schedule</h2>
+              <div class="toolbar-spacer"></div>
+              <button class="btn btn-primary" onclick="App.addCourse()">+ Add Course</button>
+            </div>
+
+            ${this.state.schedule.length === 0 ? `
+              <p class="text-center" style="padding: 3rem; color: #999;">
+                No courses scheduled yet. Click "Add Course" or import an Excel file.
+              </p>
+            ` : `
+              <div class="table-scroll-container">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>#</th>
+                      <th>WBS</th>
+                      <th>Event Name</th>
+                      <th>Instructors</th>
+                      <th>Month</th>
+                      <th>First Day</th>
+                      <th>Last Day</th>
+                      <th>FY</th>
+                      <th>Time(s)</th>
+                      <th>Location</th>
+                      <th>Primary Contact</th>
+                      <th>Duration</th>
+                      <th>FT/PT</th>
+                      <th>Total Load</th>
+                      <th>Status</th>
+                      <th style="position: sticky; right: 0; background: #f9f9f9; box-shadow: -2px 0 4px rgba(0,0,0,0.1);">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${this.state.schedule.map(course => {
+                      const coordinator = this.state.coordinators.find(c => c.id === course.coordinator);
+                      return `
+                        <tr>
+                          <td>${course.rowNumber || ''}</td>
+                          <td><small>${course.wbs || course.courseRef || ''}</small></td>
+                          <td class="wrap-text"><strong>${course.courseTitle || 'Untitled'}</strong></td>
+                          <td>${course.instructors || 'TBD'}</td>
+                          <td>${course.month || ''}</td>
+                          <td>${course.firstDay || ''}</td>
+                          <td>${course.lastDay || ''}</td>
+                          <td>${course.fy || ''}</td>
+                          <td class="wrap-text-narrow"><small>${course.times || ''}</small></td>
+                          <td>
+                            <span style="background: ${this.getLocationColor(course.locationCode || course.scheduled)}; padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.75rem; color: #333; font-weight: 500;">
+                              ${course.location || 'TBD'}
+                            </span>
+                          </td>
+                          <td>${course.primaryContact || (coordinator ? coordinator.name : 'Unassigned')}</td>
+                          <td>${course.duration || ''}</td>
+                          <td>${course.ftpt || ''}</td>
+                          <td><strong>${course.coordLoad || 0}</strong></td>
+                          <td>${course.status || 'Scheduled'}</td>
+                          <td style="position: sticky; right: 0; background: white; box-shadow: -2px 0 4px rgba(0,0,0,0.1);">
+                            <button class="btn btn-secondary btn-small" onclick="App.editCourse('${course.id}')">Edit</button>
+                            <button class="btn btn-danger btn-small" onclick="App.deleteCourse('${course.id}')">Delete</button>
+                          </td>
+                        </tr>
+                      `;
+                    }).join('')}
+                  </tbody>
+                </table>
+              </div>
+            `}
+          </div>
+        `;
+      },
+
+      // Add/Edit Course
+      addCourse() {
+        this.openDrawer({
+          title: 'Add New Course',
+          fields: {
+            wbs: { label: 'WBS Code', type: 'text', required: true },
+            courseTitle: { label: 'Event Name', type: 'text', required: true },
+            portfolio: { label: 'Portfolio', type: 'text', required: false },
+            pts: { label: 'PTS', type: 'text', required: false },
+            instructors: { label: 'Instructor(s)', type: 'text', required: true },
+            month: { label: 'Month', type: 'select', options: [
+              { value: 'JAN', label: 'January' },
+              { value: 'FEB', label: 'February' },
+              { value: 'MAR', label: 'March' },
+              { value: 'APR', label: 'April' },
+              { value: 'MAY', label: 'May' },
+              { value: 'JUN', label: 'June' },
+              { value: 'JUL', label: 'July' },
+              { value: 'AUG', label: 'August' },
+              { value: 'SEP', label: 'September' },
+              { value: 'OCT', label: 'October' },
+              { value: 'NOV', label: 'November' },
+              { value: 'DEC', label: 'December' }
+            ], required: true },
+            firstDay: { label: 'First Day', type: 'number', required: true },
+            lastDay: { label: 'Last Day', type: 'number', required: true },
+            fy: { label: 'Fiscal Year', type: 'select', options: [
+              { value: 'FY27', label: 'FY27' },
+              { value: 'FY28', label: 'FY28' }
+            ], required: true },
+            times: { label: 'Time(s)', type: 'text', required: false },
+            location: { label: 'Location', type: 'select', options: [
+              { value: 'Teams', label: 'Teams (Virtual)' },
+              { value: 'COS 1500/ATC/CHA', label: 'COS 1500/ATC/CHA' },
+              { value: 'CH L0020', label: 'CH L0020' },
+              { value: 'Virtual', label: 'Virtual' },
+              { value: 'El Segundo', label: 'El Segundo' },
+              { value: 'Chantilly', label: 'Chantilly' },
+              { value: 'Colorado Springs', label: 'Colorado Springs' }
+            ], required: true },
+            locationCode: { label: 'Status Code', type: 'select', options: [
+              { value: 'Y', label: 'Y - Scheduled' },
+              { value: 'N', label: 'N - Waiting on Instructor' },
+              { value: 'T', label: 'T - Tentative' },
+              { value: 'H', label: 'H - Hold' },
+              { value: 'C', label: 'C - Cancelled' }
+            ], required: true },
+            primaryContact: { label: 'Primary Training Contact', type: 'select', options: this.state.coordinators.map(c => ({ value: c.name, label: c.name })), required: true },
+            duration: { label: 'Duration (days)', type: 'number', required: true },
+            ftpt: { label: 'FT/PT', type: 'select', options: [
+              { value: 'FT', label: 'Full Time' },
+              { value: 'PT', label: 'Part Time' }
+            ], required: true },
+            loadPlanningLeadUp: { label: 'Load Planning: Lead Up', type: 'number', required: false },
+            loadPlanningDayOf: { label: 'Load Planning: Day Of', type: 'number', required: false },
+            loadPlanningPost: { label: 'Load Planning: Post', type: 'number', required: false },
+            coordLoad: { label: 'Total Load for Training Contact', type: 'number', required: true },
+            specialInstructions: { label: 'Special Instructions', type: 'text', required: false }
+          },
+          onSave: (data) => {
+            // Calculate start and end dates from month + day
+            const year = data.fy === 'FY27' ? 2027 : 2028;
+            const monthNum = this.parseMonth(data.month);
+            const startDate = dayjs(`${year}-${monthNum}-${data.firstDay}`).format('YYYY-MM-DD');
+            const endDate = dayjs(`${year}-${monthNum}-${data.lastDay}`).format('YYYY-MM-DD');
+
+            const newCourse = {
+              id: this.uuid(),
+              rowNumber: this.state.schedule.length + 1,
+              homeCourse: 'N',
+              wbs: data.wbs,
+              courseRef: data.wbs,
+              courseTitle: data.courseTitle,
+              portfolio: data.portfolio || '',
+              pts: data.pts || '',
+              instructors: data.instructors,
+              instructor: 'inst1', // Keep for backward compatibility
+              coordinator: 'coord1', // Keep for backward compatibility
+              primaryContact: data.primaryContact,
+              month: data.month,
+              firstDay: data.firstDay,
+              lastDay: data.lastDay,
+              startDate: startDate,
+              endDate: endDate,
+              fy: data.fy,
+              times: data.times || '',
+              location: data.location,
+              locationCode: data.locationCode,
+              scheduled: data.locationCode,
+              duration: data.duration,
+              ftpt: data.ftpt,
+              loadPlanningLeadUp: data.loadPlanningLeadUp || 0,
+              loadPlanningDayOf: data.loadPlanningDayOf || 0,
+              loadPlanningPost: data.loadPlanningPost || 0,
+              coordLoad: data.coordLoad,
+              auStaffTravel: 0,
+              stTravel: 0,
+              catering: 0,
+              vendorCost: 0,
+              specialInstructions: data.specialInstructions || '',
+              status: 'Scheduled'
+            };
+            this.state.schedule.push(newCourse);
+            this.saveState();
+            this.runRulesEngine(); // Auto-recalculate
+            this.switchTab('schedule');
+          }
+        });
+      },
+
+      editCourse(id) {
+        const course = this.state.schedule.find(c => c.id === id);
+        if (!course) return;
+
+        this.openDrawer({
+          title: 'Edit Course',
+          fields: {
+            wbs: { label: 'WBS Code', type: 'text', value: course.wbs || course.courseRef, required: true },
+            courseTitle: { label: 'Event Name', type: 'text', value: course.courseTitle, required: true },
+            portfolio: { label: 'Portfolio', type: 'text', value: course.portfolio || '', required: false },
+            pts: { label: 'PTS', type: 'text', value: course.pts || '', required: false },
+            instructors: { label: 'Instructor(s)', type: 'text', value: course.instructors || '', required: true },
+            month: { label: 'Month', type: 'select', value: course.month, options: [
+              { value: 'JAN', label: 'January' },
+              { value: 'FEB', label: 'February' },
+              { value: 'MAR', label: 'March' },
+              { value: 'APR', label: 'April' },
+              { value: 'MAY', label: 'May' },
+              { value: 'JUN', label: 'June' },
+              { value: 'JUL', label: 'July' },
+              { value: 'AUG', label: 'August' },
+              { value: 'SEP', label: 'September' },
+              { value: 'OCT', label: 'October' },
+              { value: 'NOV', label: 'November' },
+              { value: 'DEC', label: 'December' }
+            ], required: true },
+            firstDay: { label: 'First Day', type: 'number', value: course.firstDay, required: true },
+            lastDay: { label: 'Last Day', type: 'number', value: course.lastDay, required: true },
+            fy: { label: 'Fiscal Year', type: 'select', value: course.fy, options: [
+              { value: 'FY27', label: 'FY27' },
+              { value: 'FY28', label: 'FY28' }
+            ], required: true },
+            times: { label: 'Time(s)', type: 'text', value: course.times || '', required: false },
+            location: { label: 'Location', type: 'select', value: course.location, options: [
+              { value: 'Teams', label: 'Teams (Virtual)' },
+              { value: 'COS 1500/ATC/CHA', label: 'COS 1500/ATC/CHA' },
+              { value: 'CH L0020', label: 'CH L0020' },
+              { value: 'Virtual', label: 'Virtual' },
+              { value: 'El Segundo', label: 'El Segundo' },
+              { value: 'Chantilly', label: 'Chantilly' },
+              { value: 'Colorado Springs', label: 'Colorado Springs' }
+            ], required: true },
+            locationCode: { label: 'Status Code', type: 'select', value: course.locationCode || course.scheduled, options: [
+              { value: 'Y', label: 'Y - Scheduled' },
+              { value: 'N', label: 'N - Waiting on Instructor' },
+              { value: 'T', label: 'T - Tentative' },
+              { value: 'H', label: 'H - Hold' },
+              { value: 'C', label: 'C - Cancelled' }
+            ], required: true },
+            primaryContact: { label: 'Primary Training Contact', type: 'select', value: course.primaryContact, options: this.state.coordinators.map(c => ({ value: c.name, label: c.name })), required: true },
+            duration: { label: 'Duration (days)', type: 'number', value: course.duration, required: true },
+            ftpt: { label: 'FT/PT', type: 'select', value: course.ftpt, options: [
+              { value: 'FT', label: 'Full Time' },
+              { value: 'PT', label: 'Part Time' }
+            ], required: true },
+            loadPlanningLeadUp: { label: 'Load Planning: Lead Up', type: 'number', value: course.loadPlanningLeadUp || 0, required: false },
+            loadPlanningDayOf: { label: 'Load Planning: Day Of', type: 'number', value: course.loadPlanningDayOf || 0, required: false },
+            loadPlanningPost: { label: 'Load Planning: Post', type: 'number', value: course.loadPlanningPost || 0, required: false },
+            coordLoad: { label: 'Total Load for Training Contact', type: 'number', value: course.coordLoad, required: true },
+            specialInstructions: { label: 'Special Instructions', type: 'text', value: course.specialInstructions || '', required: false }
+          },
+          onSave: (data) => {
+            // Calculate start and end dates from month + day
+            const year = data.fy === 'FY27' ? 2027 : 2028;
+            const monthNum = this.parseMonth(data.month);
+            const startDate = dayjs(`${year}-${monthNum}-${data.firstDay}`).format('YYYY-MM-DD');
+            const endDate = dayjs(`${year}-${monthNum}-${data.lastDay}`).format('YYYY-MM-DD');
+
+            const index = this.state.schedule.findIndex(c => c.id === id);
+            this.state.schedule[index] = {
+              ...course,
+              wbs: data.wbs,
+              courseRef: data.wbs,
+              courseTitle: data.courseTitle,
+              portfolio: data.portfolio || '',
+              pts: data.pts || '',
+              instructors: data.instructors,
+              primaryContact: data.primaryContact,
+              month: data.month,
+              firstDay: data.firstDay,
+              lastDay: data.lastDay,
+              startDate: startDate,
+              endDate: endDate,
+              fy: data.fy,
+              times: data.times || '',
+              location: data.location,
+              locationCode: data.locationCode,
+              scheduled: data.locationCode,
+              duration: data.duration,
+              ftpt: data.ftpt,
+              loadPlanningLeadUp: data.loadPlanningLeadUp || 0,
+              loadPlanningDayOf: data.loadPlanningDayOf || 0,
+              loadPlanningPost: data.loadPlanningPost || 0,
+              coordLoad: data.coordLoad,
+              specialInstructions: data.specialInstructions || ''
+            };
+            this.saveState();
+            this.runRulesEngine(); // Auto-recalculate
+            this.switchTab('schedule');
+          }
+        });
+      },
+
+      deleteCourse(id) {
+        if (confirm('Delete this course?')) {
+          this.state.schedule = this.state.schedule.filter(c => c.id !== id);
+          this.saveState();
+          this.runRulesEngine(); // Auto-recalculate
+          this.switchTab('schedule');
+        }
+      },
+
+      // Course Catalog Management
+      renderCourseCatalog() {
+        const content = document.getElementById('content');
+
+        content.innerHTML = `
+          <div class="card" style="background: linear-gradient(135deg, #005eb815 0%, #003d8215 100%); border: 2px solid #667eea;">
+            <h2 style="color: #667eea;">📚 Course Catalog - Auto-Schedule Generator</h2>
+            <p style="color: #666; margin-bottom: 1rem;">Define your course templates with instructors, session counts, and preferences. Then auto-generate your entire FY schedule with one click!</p>
+
+            ${this.state.settings.scheduleLocked ? `
+              <div style="background: #fee; border: 2px solid #ef4444; padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
+                <p style="color: #991b1b; font-weight: 600; margin-bottom: 0.5rem;">🔒 Schedule is LOCKED</p>
+                <p style="color: #991b1b; font-size: 0.875rem;">
+                  Auto-generation is disabled to prevent accidental schedule replacement.<br>
+                  Go to Settings tab to unlock if you need to regenerate.
+                </p>
+              </div>
+            ` : ''}
+
+            <div style="background: white; padding: 1rem; border-radius: 8px; margin-top: 1rem;">
+              <h3 style="font-size: 1rem; margin-bottom: 0.5rem;">How It Works:</h3>
+              <ol style="color: #666; padding-left: 1.5rem; line-height: 1.8;">
+                <li>Add courses to the catalog below (specify title, instructors, # of sessions, time preferences)</li>
+                <li>Click <strong>"Generate FY Schedule"</strong> button</li>
+                <li>System will create a balanced schedule avoiding conflicts and blackout dates</li>
+                <li>Review and adjust the generated schedule in the Schedule tab</li>
+              </ol>
+              <button
+                class="btn btn-primary"
+                style="margin-top: 1rem; font-size: 1rem; padding: 0.75rem 2rem; ${this.state.settings.scheduleLocked ? 'opacity: 0.5; cursor: not-allowed;' : ''}"
+                onclick="${this.state.settings.scheduleLocked ? 'App.showLockMessage()' : 'App.autoGenerateSchedule()'}"
+                ${this.state.settings.scheduleLocked ? 'title="Schedule is locked - unlock in Settings"' : ''}
+              >
+                ${this.state.settings.scheduleLocked ? '🔒 Generate FY Schedule (Locked)' : '🎯 Generate FY Schedule from Catalog'}
+              </button>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="toolbar">
+              <h2 style="margin: 0;">📖 Course Templates</h2>
+              <div class="toolbar-spacer"></div>
+              <button class="btn btn-primary" onclick="App.addCourseTemplate()">+ Add Course Template</button>
+            </div>
+
+            ${this.state.courseCatalog.length === 0 ? `
+              <p class="text-center" style="padding: 3rem; color: #999;">
+                No course templates yet. Click "Add Course Template" to define your training courses.
+              </p>
+            ` : `
+              <div style="overflow-x: auto;">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>WBS</th>
+                      <th>Event Name</th>
+                      <th>Instructor</th>
+                      <th>Preferred Coordinator</th>
+                      <th>Portfolio</th>
+                      <th>Sessions/Year</th>
+                      <th>Duration</th>
+                      <th>FT/PT</th>
+                      <th>Avg Total Load</th>
+                      <th>Location</th>
+                      <th>Preferred Months</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${this.state.courseCatalog.map(template => {
+                      return `
+                        <tr>
+                          <td><strong>${template.wbs || template.courseRef}</strong></td>
+                          <td>${template.courseTitle}</td>
+                          <td>${template.instructorName || 'Not assigned'}</td>
+                          <td>${template.coordinatorName || 'Any'}</td>
+                          <td>${template.portfolio || '-'}</td>
+                          <td>${template.sessionsPerYear}</td>
+                          <td>${template.durationDays} days</td>
+                          <td>${template.ftpt || '-'}</td>
+                          <td>${template.avgCoordLoad} hrs</td>
+                          <td>${template.location || 'TBD'}</td>
+                          <td>${template.preferredMonths || 'Any'}</td>
+                          <td>
+                            <button class="btn btn-secondary btn-small" onclick="App.editCourseTemplate('${template.id}')">Edit</button>
+                            <button class="btn btn-danger btn-small" onclick="App.deleteCourseTemplate('${template.id}')">Delete</button>
+                          </td>
+                        </tr>
+                      `;
+                    }).join('')}
+                  </tbody>
+                </table>
+              </div>
+            `}
+          </div>
+        `;
+      },
+
+      addCourseTemplate() {
+        this.openDrawer({
+          title: 'Add Course Template',
+          fields: {
+            instructorName: { label: 'Instructor Name *', type: 'text', required: true },
+            coordinatorName: { label: 'Preferred Coordinator', type: 'select', options: [
+              { value: '', label: 'Any Available' },
+              ...this.state.coordinators.map(c => ({ value: c.name, label: c.name }))
+            ], required: false },
+            wbs: { label: 'WBS Code *', type: 'text', required: true },
+            courseTitle: { label: 'Event Name *', type: 'text', required: true },
+            portfolio: { label: 'Portfolio', type: 'text', required: false },
+            pts: { label: 'PTS', type: 'text', required: false },
+            sessionsPerYear: { label: 'Number of Sessions per Year *', type: 'number', value: 1, required: true },
+            avgCoordLoad: { label: 'Average Total Load (hours) *', type: 'number', value: 6, required: true },
+            durationDays: { label: 'Course Duration (days) *', type: 'number', value: 2, required: true },
+            ftpt: { label: 'FT/PT *', type: 'select', options: [
+              { value: 'FT', label: 'Full Time' },
+              { value: 'PT', label: 'Part Time' }
+            ], required: true },
+            loadPlanningLeadUp: { label: 'Load Planning: Lead Up', type: 'number', value: 0.5, required: false },
+            loadPlanningDayOf: { label: 'Load Planning: Day Of', type: 'number', value: 1.0, required: false },
+            loadPlanningPost: { label: 'Load Planning: Post', type: 'number', value: 0.5, required: false },
+            location: { label: 'Default Location', type: 'select', options: [
+              { value: 'Teams', label: 'Teams (Virtual)' },
+              { value: 'COS 1500/ATC/CHA', label: 'COS 1500/ATC/CHA' },
+              { value: 'Virtual', label: 'Virtual' },
+              { value: 'El Segundo', label: 'El Segundo' },
+              { value: 'Chantilly', label: 'Chantilly' },
+              { value: 'Colorado Springs', label: 'Colorado Springs' }
+            ], required: false },
+            preferredMonths: { label: 'Preferred Months (e.g., Oct-Dec, Any)', type: 'text', required: false },
+            notes: { label: 'Notes / Special Instructions', type: 'text', required: false }
+          },
+          onSave: (data) => {
+            const newTemplate = {
+              id: this.uuid(),
+              ...data,
+              courseRef: data.wbs,
+              instructorIds: []
+            };
+            this.state.courseCatalog.push(newTemplate);
+            this.saveState();
+            alert('Course template added successfully!');
+            this.switchTab('catalog');
+          }
+        });
+      },
+
+      editCourseTemplate(id) {
+        const template = this.state.courseCatalog.find(t => t.id === id);
+        if (!template) return;
+
+        // Create instructor checkboxes
+        const instructorOptions = this.state.instructors.map(inst => {
+          const isChecked = (template.instructorIds || []).includes(inst.id);
+          return `
+            <label style="display: block; margin-bottom: 0.5rem;">
+              <input type="checkbox" name="instructor_${inst.id}" ${isChecked ? 'checked' : ''} style="margin-right: 0.5rem;">
+              ${inst.name} (${inst.type})
+            </label>
+          `;
+        }).join('');
+
+        const panel = document.getElementById('drawerPanel');
+        panel.innerHTML = `
+          <div class="drawer-header">
+            <h2>Edit Course Template</h2>
+            <button class="drawer-close" onclick="App.closeDrawer()">&times;</button>
+          </div>
+          <div class="drawer-body">
+            <div class="form-group">
+              <label class="form-label">Instructor Name *</label>
+              <input type="text" class="form-input" id="instructorName" value="${template.instructorName || ''}" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Preferred Coordinator</label>
+              <select class="form-select" id="coordinatorName">
+                <option value="">Any Available</option>
+                ${this.state.coordinators.map(c => `
+                  <option value="${c.name}" ${template.coordinatorName === c.name ? 'selected' : ''}>${c.name}</option>
+                `).join('')}
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">WBS Code *</label>
+              <input type="text" class="form-input" id="wbs" value="${template.wbs || template.courseRef}" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Event Name *</label>
+              <input type="text" class="form-input" id="courseTitle" value="${template.courseTitle}" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Portfolio</label>
+              <input type="text" class="form-input" id="portfolio" value="${template.portfolio || ''}">
+            </div>
+            <div class="form-group">
+              <label class="form-label">PTS</label>
+              <input type="text" class="form-input" id="pts" value="${template.pts || ''}">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Sessions per Year *</label>
+              <input type="number" class="form-input" id="sessionsPerYear" value="${template.sessionsPerYear}" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Average Total Load (hours) *</label>
+              <input type="number" class="form-input" id="avgCoordLoad" value="${template.avgCoordLoad}" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Course Duration (days) *</label>
+              <input type="number" class="form-input" id="durationDays" value="${template.durationDays}" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">FT/PT</label>
+              <select class="form-select" id="ftpt">
+                <option value="FT" ${template.ftpt === 'FT' ? 'selected' : ''}>Full Time</option>
+                <option value="PT" ${template.ftpt === 'PT' ? 'selected' : ''}>Part Time</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Load Planning: Lead Up</label>
+              <input type="number" step="0.1" class="form-input" id="loadPlanningLeadUp" value="${template.loadPlanningLeadUp || 0}">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Load Planning: Day Of</label>
+              <input type="number" step="0.1" class="form-input" id="loadPlanningDayOf" value="${template.loadPlanningDayOf || 0}">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Load Planning: Post</label>
+              <input type="number" step="0.1" class="form-input" id="loadPlanningPost" value="${template.loadPlanningPost || 0}">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Default Location</label>
+              <select class="form-select" id="location">
+                <option value="">Select...</option>
+                <option value="Teams" ${template.location === 'Teams' ? 'selected' : ''}>Teams (Virtual)</option>
+                <option value="Virtual" ${template.location === 'Virtual' ? 'selected' : ''}>Virtual</option>
+                <option value="El Segundo" ${template.location === 'El Segundo' ? 'selected' : ''}>El Segundo</option>
+                <option value="Chantilly" ${template.location === 'Chantilly' ? 'selected' : ''}>Chantilly</option>
+                <option value="Colorado Springs" ${template.location === 'Colorado Springs' ? 'selected' : ''}>Colorado Springs</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Preferred Months</label>
+              <input type="text" class="form-input" id="preferredMonths" value="${template.preferredMonths || ''}" placeholder="e.g., Oct-Dec, Jan-Mar, or Any">
+              <p style="font-size: 0.75rem; color: #666; margin-top: 0.25rem;">Leave blank for any time</p>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Notes / Special Instructions</label>
+              <textarea class="form-input" id="notes" rows="3">${template.notes || ''}</textarea>
+            </div>
+          </div>
+          <div class="drawer-footer">
+            <button class="btn btn-secondary" onclick="App.closeDrawer()">Cancel</button>
+            <button class="btn btn-primary" onclick="App.saveCourseTemplate('${id}')">Save Changes</button>
+          </div>
+        `;
+
+        const overlay = document.getElementById('drawerOverlay');
+        overlay.classList.add('open');
+        panel.classList.add('open');
+      },
+
+      saveCourseTemplate(id) {
+        const template = this.state.courseCatalog.find(t => t.id === id);
+        if (!template) return;
+
+        // Update template
+        template.instructorName = document.getElementById('instructorName').value;
+        template.coordinatorName = document.getElementById('coordinatorName').value;
+        template.wbs = document.getElementById('wbs').value;
+        template.courseRef = document.getElementById('wbs').value;
+        template.courseTitle = document.getElementById('courseTitle').value;
+        template.portfolio = document.getElementById('portfolio').value;
+        template.pts = document.getElementById('pts').value;
+        template.sessionsPerYear = parseInt(document.getElementById('sessionsPerYear').value);
+        template.avgCoordLoad = parseFloat(document.getElementById('avgCoordLoad').value);
+        template.durationDays = parseInt(document.getElementById('durationDays').value);
+        template.ftpt = document.getElementById('ftpt').value;
+        template.loadPlanningLeadUp = parseFloat(document.getElementById('loadPlanningLeadUp').value || 0);
+        template.loadPlanningDayOf = parseFloat(document.getElementById('loadPlanningDayOf').value || 0);
+        template.loadPlanningPost = parseFloat(document.getElementById('loadPlanningPost').value || 0);
+        template.location = document.getElementById('location').value;
+        template.preferredMonths = document.getElementById('preferredMonths').value;
+        template.notes = document.getElementById('notes').value;
+
+        this.saveState();
+        this.closeDrawer();
+        this.switchTab('catalog');
+      },
+
+      deleteCourseTemplate(id) {
+        if (confirm('Delete this course template?')) {
+          this.state.courseCatalog = this.state.courseCatalog.filter(t => t.id !== id);
+          this.saveState();
+          this.switchTab('catalog');
+        }
+      },
+
+      toggleScheduleLock() {
+        const newState = !this.state.settings.scheduleLocked;
+
+        if (newState) {
+          // Locking
+          const confirm = window.confirm(
+            '🔒 Lock Schedule?\n\n' +
+            'This will prevent accidental regeneration of your schedule.\n\n' +
+            'You can still:\n' +
+            '• Manually add/edit/delete courses\n' +
+            '• Import additional courses\n' +
+            '• Export schedules\n\n' +
+            'You cannot:\n' +
+            '• Auto-generate from catalog (until unlocked)\n\n' +
+            'Recommended after finalizing your annual FY schedule.\n\n' +
+            'Continue?'
+          );
+
+          if (!confirm) return;
+
+          this.state.settings.scheduleLocked = true;
+          this.saveState();
+          alert('✓ Schedule is now LOCKED\n\nAuto-generation is disabled.\nManual edits are still allowed.\n\nUnlock in Settings when needed.');
+        } else {
+          // Unlocking
+          const confirm = window.confirm(
+            '🔓 Unlock Schedule?\n\n' +
+            'This will allow auto-generation from catalog.\n\n' +
+            '⚠️ WARNING: Auto-generation REPLACES your entire schedule!\n\n' +
+            'Only unlock if you need to regenerate from scratch.\n\n' +
+            'Continue?'
+          );
+
+          if (!confirm) return;
+
+          this.state.settings.scheduleLocked = false;
+          this.saveState();
+          alert('✓ Schedule is now UNLOCKED\n\nAuto-generation is now available.\n\nRemember to lock again after finalizing!');
+        }
+
+        this.switchTab('settings');
+      },
+
+      showLockMessage() {
+        alert(
+          '🔒 Schedule is Locked\n\n' +
+          'Auto-generation is disabled to prevent accidental schedule replacement.\n\n' +
+          'To generate a new schedule:\n' +
+          '1. Go to Settings tab\n' +
+          '2. Click "Unlock Schedule"\n' +
+          '3. Return here to generate\n\n' +
+          'Note: This is a safety feature. Manual edits are still allowed on the Schedule tab.'
+        );
+      },
+
+      autoGenerateSchedule() {
+        if (this.state.settings.scheduleLocked) {
+          this.showLockMessage();
+          return;
+        }
+
+        if (this.state.courseCatalog.length === 0) {
+          alert('Please add course templates to the catalog first!');
+          return;
+        }
+
+        // Enhanced warning with current schedule info
+        const currentCount = this.state.schedule.length;
+        const warningMsg = currentCount > 0
+          ? `⚠️ WARNING: You currently have ${currentCount} courses scheduled.\n\n` +
+            `This will REPLACE your current schedule with an auto-generated one.\n\n` +
+            `Recommendation: Export your current schedule as a backup first!\n\n` +
+            `Continue with auto-generation?`
+          : `Generate FY schedule from your ${this.state.courseCatalog.length} course templates?\n\n` +
+            `This will create a balanced schedule for the fiscal year.`;
+
+        if (!confirm(warningMsg)) {
+          return;
+        }
+
+        const fyStart = dayjs(this.state.settings.fiscalYearStart || '2027-10-01');
+        const fyEnd = fyStart.add(12, 'month');
+
+        const newSchedule = [];
+        let currentDate = fyStart;
+
+        // Generate sessions for each course template
+        this.state.courseCatalog.forEach(template => {
+          const sessionsToCreate = template.sessionsPerYear || 1;
+
+          // Calculate spacing between sessions
+          const monthsPerSession = Math.floor(12 / sessionsToCreate);
+
+          for (let i = 0; i < sessionsToCreate; i++) {
+            // Calculate start date
+            let sessionStart = currentDate.add(i * monthsPerSession, 'month');
+
+            // Apply preferred months if specified
+            if (template.preferredMonths && template.preferredMonths !== 'Any') {
+              // Simple logic: try to fit in preferred range
+              // More sophisticated logic could be added here
+            }
+
+            // Check blackout dates and adjust
+            let attempts = 0;
+            while (this.isInBlackoutPeriod(sessionStart) && attempts < 10) {
+              sessionStart = sessionStart.add(7, 'day');
+              attempts++;
+            }
+
+            const sessionEnd = sessionStart.add(template.durationDays || 2, 'day');
+
+            // Assign coordinator (use preferred or round-robin)
+            let coordinator;
+            if (template.coordinatorName) {
+              coordinator = this.state.coordinators.find(c => c.name === template.coordinatorName);
+            }
+            if (!coordinator) {
+              const coordIndex = newSchedule.length % this.state.coordinators.length;
+              coordinator = this.state.coordinators[coordIndex];
+            }
+
+            newSchedule.push({
+              id: this.uuid(),
+              rowNumber: newSchedule.length + 1,
+              homeCourse: 'N',
+              portfolio: template.portfolio || '',
+              wbs: template.wbs || template.courseRef,
+              pts: template.pts || '',
+              courseRef: template.wbs || template.courseRef,
+              courseTitle: template.courseTitle,
+              instructor: 'inst1',
+              instructors: template.instructorName || '',
+              coordinator: coordinator?.id || 'coord1',
+              primaryContact: coordinator?.name || '',
+              month: sessionStart.format('MMM').toUpperCase(),
+              firstDay: parseInt(sessionStart.format('D')),
+              lastDay: parseInt(sessionEnd.format('D')),
+              startDate: sessionStart.format('YYYY-MM-DD'),
+              endDate: sessionEnd.format('YYYY-MM-DD'),
+              fy: sessionStart.year() === 2027 ? 'FY27' : 'FY28',
+              times: '',
+              location: template.location || 'Teams',
+              locationCode: 'N',
+              scheduled: 'N',
+              specialInstructions: template.notes || '',
+              duration: template.durationDays || 2,
+              ftpt: template.ftpt || 'PT',
+              loadPlanningLeadUp: template.loadPlanningLeadUp || 0,
+              loadPlanningDayOf: template.loadPlanningDayOf || 0,
+              loadPlanningPost: template.loadPlanningPost || 0,
+              coordLoad: template.avgCoordLoad || 6,
+              auStaffTravel: 0,
+              stTravel: 0,
+              catering: 0,
+              vendorCost: 0,
+              status: 'Scheduled'
+            });
+          }
+        });
+
+        this.state.schedule = newSchedule;
+        this.saveState();
+        this.runRulesEngine();
+        alert(`Generated ${newSchedule.length} course sessions! Review them in the Schedule tab.`);
+        this.switchTab('schedule');
+      },
+
+      isInBlackoutPeriod(date) {
+        const checkDate = dayjs(date);
+        return this.state.rules.blackoutDates.some(blackout => {
+          const start = dayjs(blackout.startDate);
+          const end = dayjs(blackout.endDate);
+          return checkDate.isAfter(start) && checkDate.isBefore(end) ||
+                 checkDate.isSame(start) || checkDate.isSame(end);
+        });
+      },
+
+      // People Management (Coordinators & Instructors)
+      renderPeople() {
+        const content = document.getElementById('content');
+
+        content.innerHTML = `
+          <div class="card">
+            <div class="toolbar">
+              <h2 style="margin: 0;">👥 Training Coordinators</h2>
+              <div class="toolbar-spacer"></div>
+              <button class="btn btn-primary" onclick="App.addCoordinator()">+ Add Coordinator</button>
+            </div>
+
+            <div style="overflow-x: auto;">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>Type</th>
+                    <th>Monthly Capacity (hrs)</th>
+                    <th>Current Load (hrs)</th>
+                    <th>Utilization</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${this.state.coordinators.map(coord => {
+                    const load = this.state.schedule
+                      .filter(c => c.coordinator === coord.id)
+                      .reduce((sum, c) => sum + (c.coordLoad || 0), 0);
+                    const utilization = coord.capacity > 0 ? Math.round((load / coord.capacity) * 100) : 0;
+                    return `
+                      <tr>
+                        <td>${coord.name}</td>
+                        <td><span style="background: ${coord.type === 'FT' ? '#dbeafe' : '#fef3c7'}; padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.75rem; font-weight: 600;">${coord.type}</span></td>
+                        <td>${coord.capacity}</td>
+                        <td>${load}</td>
+                        <td>
+                          <span style="color: ${utilization > 100 ? '#ef4444' : utilization > 80 ? '#f59e0b' : '#10b981'}">
+                            ${utilization}%
+                          </span>
+                        </td>
+                        <td>
+                          <button class="btn btn-secondary btn-small" onclick="App.editCoordinator('${coord.id}')">Edit</button>
+                          <button class="btn btn-danger btn-small" onclick="App.deleteCoordinator('${coord.id}')">Delete</button>
+                        </td>
+                      </tr>
+                    `;
+                  }).join('')}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="card" style="margin-top: 2rem;">
+            <div class="toolbar">
+              <h2 style="margin: 0;">🎓 Instructors</h2>
+              <div class="toolbar-spacer"></div>
+              <button class="btn btn-primary" onclick="App.addInstructor()">+ Add Instructor</button>
+            </div>
+
+            <div style="overflow-x: auto;">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>Department</th>
+                    <th>Monthly Capacity (hrs)</th>
+                    <th>Courses Assigned</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${this.state.instructors.map(inst => {
+                    const courseCount = this.state.schedule.filter(c => c.instructor === inst.id).length;
+                    return `
+                      <tr>
+                        <td>${inst.name}</td>
+                        <td>${inst.department}</td>
+                        <td>${inst.capacity || 40}</td>
+                        <td>${courseCount}</td>
+                        <td>
+                          <button class="btn btn-secondary btn-small" onclick="App.editInstructor('${inst.id}')">Edit</button>
+                          <button class="btn btn-danger btn-small" onclick="App.deleteInstructor('${inst.id}')">Delete</button>
+                        </td>
+                      </tr>
+                    `;
+                  }).join('')}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        `;
+      },
+
+      addCoordinator() {
+        this.openDrawer({
+          title: 'Add Coordinator',
+          fields: {
+            name: { label: 'Name', type: 'text', required: true },
+            type: { label: 'Type', type: 'select', options: [
+              { value: 'FT', label: 'Full Time Specialist' },
+              { value: 'PT', label: 'Part Time / Admin Pool' }
+            ], required: true },
+            capacity: { label: 'Monthly Capacity (hours)', type: 'number', required: true }
+          },
+          onSave: (data) => {
+            const newCoord = {
+              id: this.uuid(),
+              ...data
+            };
+            this.state.coordinators.push(newCoord);
+            this.saveState();
+            this.runRulesEngine(); // Auto-recalculate with new coordinator
+            this.switchTab('people');
+          }
+        });
+      },
+
+      editCoordinator(id) {
+        const coord = this.state.coordinators.find(c => c.id === id);
+        if (!coord) return;
+
+        this.openDrawer({
+          title: 'Edit Coordinator',
+          fields: {
+            name: { label: 'Name', type: 'text', value: coord.name, required: true },
+            type: { label: 'Type', type: 'select', value: coord.type, options: [
+              { value: 'FT', label: 'Full Time Specialist' },
+              { value: 'PT', label: 'Part Time / Admin Pool' }
+            ], required: true },
+            capacity: { label: 'Monthly Capacity (hours)', type: 'number', value: coord.capacity, required: true }
+          },
+          onSave: (data) => {
+            const index = this.state.coordinators.findIndex(c => c.id === id);
+            this.state.coordinators[index] = { ...coord, ...data };
+            this.saveState();
+            this.runRulesEngine(); // Auto-recalculate after capacity change
+            this.switchTab('people');
+          }
+        });
+      },
+
+      deleteCoordinator(id) {
+        if (confirm('Delete this coordinator?')) {
+          this.state.coordinators = this.state.coordinators.filter(c => c.id !== id);
+          this.saveState();
+          this.switchTab('people');
+        }
+      },
+
+      // Rules Page
+      renderRules() {
+        const content = document.getElementById('content');
+        content.innerHTML = `
+          <div class="card">
+            <h2>⚙️ Scheduling Rules & Configuration</h2>
+
+            <h3 style="margin-top: 1.5rem; margin-bottom: 1rem; font-size: 1rem; color: #667eea;">Global Settings</h3>
+
+            <div class="form-group">
+              <label class="form-label">Global Load Reduction (%)</label>
+              <input type="number" class="form-input" value="${this.state.rules.globalReduction * 100}"
+                     onchange="App.updateGlobalReduction(this.value)" step="1" min="0" max="100">
+              <p style="font-size: 0.75rem; color: #666; margin-top: 0.25rem;">Expected efficiency improvement through automation and process streamlining (Target: 15%)</p>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Full-Time Instructor Multiplier</label>
+              <input type="number" class="form-input" value="${this.state.rules.ftMultiplier}"
+                     onchange="App.updateFTMultiplier(this.value)" step="0.1" min="0" max="5">
+              <p style="font-size: 0.75rem; color: #666; margin-top: 0.25rem;">Load adjustment factor for full-time instructors (1.0 = no adjustment)</p>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Part-Time Instructor Multiplier</label>
+              <input type="number" class="form-input" value="${this.state.rules.ptMultiplier}"
+                     onchange="App.updatePTMultiplier(this.value)" step="0.1" min="0" max="5">
+              <p style="font-size: 0.75rem; color: #666; margin-top: 0.25rem;">Load adjustment factor for part-time instructors (1.2 = 20% higher load)</p>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="toolbar">
+              <h2 style="margin: 0;">🚫 Blackout Dates</h2>
+              <div class="toolbar-spacer"></div>
+              <button class="btn btn-primary" onclick="App.addBlackoutDate()">+ Add Blackout Date</button>
+            </div>
+            <p style="color: #666; font-size: 0.875rem; margin-bottom: 1rem;">Define periods when training should not be scheduled (holidays, organizational events, etc.)</p>
+
+            ${this.state.rules.blackoutDates.length === 0 ? `
+              <p style="text-align: center; color: #999; padding: 2rem;">No blackout dates defined</p>
+            ` : `
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>Start Date</th>
+                    <th>End Date</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${this.state.rules.blackoutDates.map(blackout => `
+                    <tr>
+                      <td>${blackout.name}</td>
+                      <td>${this.formatDate(blackout.startDate)}</td>
+                      <td>${this.formatDate(blackout.endDate)}</td>
+                      <td>
+                        <button class="btn btn-secondary btn-small" onclick="App.editBlackoutDate('${blackout.id}')">Edit</button>
+                        <button class="btn btn-danger btn-small" onclick="App.deleteBlackoutDate('${blackout.id}')">Delete</button>
+                      </td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+            `}
+          </div>
+
+          <div class="card">
+            <div class="toolbar">
+              <h2 style="margin: 0;">🔗 Course Dependencies</h2>
+              <div class="toolbar-spacer"></div>
+              <button class="btn btn-primary" onclick="App.addDependency()">+ Add Dependency</button>
+            </div>
+            <p style="color: #666; font-size: 0.875rem; margin-bottom: 1rem;">Define prerequisite relationships between courses</p>
+
+            ${this.state.rules.dependencies.length === 0 ? `
+              <p style="text-align: center; color: #999; padding: 2rem;">No dependencies defined</p>
+            ` : `
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Prerequisite Course</th>
+                    <th>Dependent Course</th>
+                    <th>Type</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${this.state.rules.dependencies.map(dep => `
+                    <tr>
+                      <td>${dep.prerequisite}</td>
+                      <td>${dep.dependent}</td>
+                      <td>${dep.type}</td>
+                      <td>
+                        <button class="btn btn-secondary btn-small" onclick="App.editDependency('${dep.id}')">Edit</button>
+                        <button class="btn btn-danger btn-small" onclick="App.deleteDependency('${dep.id}')">Delete</button>
+                      </td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+            `}
+          </div>
+
+          <div class="card">
+            <div class="toolbar">
+              <h2 style="margin: 0;">⚠️ Capacity Restrictions</h2>
+              <div class="toolbar-spacer"></div>
+              <button class="btn btn-primary" onclick="App.addRestriction()">+ Add Restriction</button>
+            </div>
+            <p style="color: #666; font-size: 0.875rem; margin-bottom: 1rem;">Set custom capacity limits for specific coordinators or time periods</p>
+
+            ${this.state.rules.restrictions.length === 0 ? `
+              <p style="text-align: center; color: #999; padding: 2rem;">No restrictions defined</p>
+            ` : `
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Coordinator</th>
+                    <th>Max Hours</th>
+                    <th>Period</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${this.state.rules.restrictions.map(res => {
+                    const coord = this.state.coordinators.find(c => c.id === res.coordinatorId);
+                    return `
+                      <tr>
+                        <td>${coord ? coord.name : 'Unknown'}</td>
+                        <td>${res.maxHours} hrs</td>
+                        <td>${res.period || 'All periods'}</td>
+                        <td>
+                          <button class="btn btn-secondary btn-small" onclick="App.editRestriction('${res.id}')">Edit</button>
+                          <button class="btn btn-danger btn-small" onclick="App.deleteRestriction('${res.id}')">Delete</button>
+                        </td>
+                      </tr>
+                    `;
+                  }).join('')}
+                </tbody>
+              </table>
+            `}
+          </div>
+
+          <div class="card" style="background: linear-gradient(135deg, #10b98115 0%, #05966915 100%); border: 2px solid #10b981;">
+            <h2 style="color: #059669;">✓ Apply Rules</h2>
+            <p style="color: #065f46; margin-bottom: 1rem;">After making changes to rules, click below to recalculate warnings and capacity checks.</p>
+            <button class="btn btn-primary" style="font-size: 1rem; padding: 0.75rem 2rem; background: #10b981; border: none;" onclick="App.runRulesEngine(); App.switchTab('dashboard');">
+              ⚡ Recalculate & View Dashboard
+            </button>
+          </div>
+        `;
+      },
+
+      updateGlobalReduction(value) {
+        this.state.rules.globalReduction = parseFloat(value) / 100;
+        this.saveState();
+      },
+
+      updateFTMultiplier(value) {
+        this.state.rules.ftMultiplier = parseFloat(value) || 1.0;
+        this.saveState();
+      },
+
+      updatePTMultiplier(value) {
+        this.state.rules.ptMultiplier = parseFloat(value) || 1.2;
+        this.saveState();
+      },
+
+      // Blackout Dates
+      addBlackoutDate() {
+        this.openDrawer({
+          title: 'Add Blackout Date',
+          fields: {
+            name: { label: 'Name (e.g., Winter Break)', type: 'text', required: true },
+            startDate: { label: 'Start Date', type: 'date', required: true },
+            endDate: { label: 'End Date', type: 'date', required: true }
+          },
+          onSave: (data) => {
+            const newBlackout = {
+              id: this.uuid(),
+              ...data
+            };
+            this.state.rules.blackoutDates.push(newBlackout);
+            this.saveState();
+            this.runRulesEngine(); // Auto-recalculate to check for blackout conflicts
+            this.switchTab('rules');
+          }
+        });
+      },
+
+      deleteBlackoutDate(id) {
+        if (confirm('Delete this blackout date?')) {
+          this.state.rules.blackoutDates = this.state.rules.blackoutDates.filter(b => b.id !== id);
+          this.saveState();
+          this.runRulesEngine(); // Auto-recalculate after blackout deletion
+          this.switchTab('rules');
+        }
+      },
+
+      editBlackoutDate(id) {
+        const blackout = this.state.rules.blackoutDates.find(b => b.id === id);
+        if (!blackout) return;
+
+        this.openDrawer({
+          title: 'Edit Blackout Date',
+          fields: {
+            name: { label: 'Name (e.g., Winter Break)', type: 'text', value: blackout.name, required: true },
+            startDate: { label: 'Start Date', type: 'date', value: blackout.startDate, required: true },
+            endDate: { label: 'End Date', type: 'date', value: blackout.endDate, required: true }
+          },
+          onSave: (data) => {
+            const index = this.state.rules.blackoutDates.findIndex(b => b.id === id);
+            this.state.rules.blackoutDates[index] = { ...blackout, ...data };
+            this.saveState();
+            this.runRulesEngine(); // Auto-recalculate after blackout date change
+            this.switchTab('rules');
+          }
+        });
+      },
+
+      // Dependencies
+      addDependency() {
+        const courses = this.state.schedule.map(c => ({ value: c.courseRef, label: `${c.courseRef} - ${c.courseTitle}` }));
+
+        this.openDrawer({
+          title: 'Add Course Dependency',
+          fields: {
+            prerequisite: { label: 'Prerequisite Course', type: 'select', options: courses, required: true },
+            dependent: { label: 'Dependent Course', type: 'select', options: courses, required: true },
+            type: { label: 'Type', type: 'select', options: [
+              { value: 'prerequisite', label: 'Must complete before' },
+              { value: 'corequisite', label: 'Should take together' }
+            ], required: true }
+          },
+          onSave: (data) => {
+            const newDep = {
+              id: this.uuid(),
+              ...data
+            };
+            this.state.rules.dependencies.push(newDep);
+            this.saveState();
+            this.switchTab('rules');
+          }
+        });
+      },
+
+      deleteDependency(id) {
+        if (confirm('Delete this dependency?')) {
+          this.state.rules.dependencies = this.state.rules.dependencies.filter(d => d.id !== id);
+          this.saveState();
+          this.switchTab('rules');
+        }
+      },
+
+      editDependency(id) {
+        const dep = this.state.rules.dependencies.find(d => d.id === id);
+        if (!dep) return;
+
+        const courses = this.state.schedule.map(c => ({ value: c.courseRef, label: `${c.courseRef} - ${c.courseTitle}` }));
+
+        this.openDrawer({
+          title: 'Edit Course Dependency',
+          fields: {
+            prerequisite: { label: 'Prerequisite Course', type: 'select', value: dep.prerequisite, options: courses, required: true },
+            dependent: { label: 'Dependent Course', type: 'select', value: dep.dependent, options: courses, required: true },
+            type: { label: 'Type', type: 'select', value: dep.type, options: [
+              { value: 'prerequisite', label: 'Must complete before' },
+              { value: 'corequisite', label: 'Should take together' }
+            ], required: true }
+          },
+          onSave: (data) => {
+            const index = this.state.rules.dependencies.findIndex(d => d.id === id);
+            this.state.rules.dependencies[index] = { ...dep, ...data };
+            this.saveState();
+            this.switchTab('rules');
+          }
+        });
+      },
+
+      // Restrictions
+      addRestriction() {
+        this.openDrawer({
+          title: 'Add Capacity Restriction',
+          fields: {
+            coordinatorId: { label: 'Coordinator', type: 'select', options: this.state.coordinators.map(c => ({ value: c.id, label: c.name })), required: true },
+            maxHours: { label: 'Maximum Hours', type: 'number', required: true },
+            period: { label: 'Period (optional)', type: 'text', required: false }
+          },
+          onSave: (data) => {
+            const newRes = {
+              id: this.uuid(),
+              ...data
+            };
+            this.state.rules.restrictions.push(newRes);
+            this.saveState();
+            this.switchTab('rules');
+          }
+        });
+      },
+
+      deleteRestriction(id) {
+        if (confirm('Delete this restriction?')) {
+          this.state.rules.restrictions = this.state.rules.restrictions.filter(r => r.id !== id);
+          this.saveState();
+          this.switchTab('rules');
+        }
+      },
+
+      editRestriction(id) {
+        const res = this.state.rules.restrictions.find(r => r.id === id);
+        if (!res) return;
+
+        this.openDrawer({
+          title: 'Edit Capacity Restriction',
+          fields: {
+            coordinatorId: { label: 'Coordinator', type: 'select', value: res.coordinatorId, options: this.state.coordinators.map(c => ({ value: c.id, label: c.name })), required: true },
+            maxHours: { label: 'Maximum Hours', type: 'number', value: res.maxHours, required: true },
+            period: { label: 'Period (optional)', type: 'text', value: res.period || '', required: false }
+          },
+          onSave: (data) => {
+            const index = this.state.rules.restrictions.findIndex(r => r.id === id);
+            this.state.rules.restrictions[index] = { ...res, ...data };
+            this.saveState();
+            this.switchTab('rules');
+          }
+        });
+      },
+
+      editInstructor(id) {
+        const inst = this.state.instructors.find(i => i.id === id);
+        if (!inst) return;
+
+        this.openDrawer({
+          title: 'Edit Instructor',
+          fields: {
+            name: { label: 'Name', type: 'text', value: inst.name, required: true },
+            department: { label: 'Department', type: 'text', value: inst.department, required: true },
+            capacity: { label: 'Monthly Capacity (hours)', type: 'number', value: inst.capacity || 40, required: true }
+          },
+          onSave: (data) => {
+            const index = this.state.instructors.findIndex(i => i.id === id);
+            this.state.instructors[index] = { ...inst, ...data };
+            this.saveState();
+            this.switchTab('people');
+          }
+        });
+      },
+
+      // Import/Export
+      renderImportExport() {
+        const content = document.getElementById('content');
+
+        const scheduleCount = this.state.schedule.length;
+        const lastImport = this.state.meta.lastImport
+          ? new Date(this.state.meta.lastImport).toLocaleString()
+          : 'Never';
+        const lastImportName = this.state.meta.lastImportName || 'N/A';
+
+        content.innerHTML = `
+          <div class="card" style="background: #f0f9ff; border: 2px solid #005eb8;">
+            <h2 style="color: #005eb8;">📊 Current Schedule Status</h2>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-top: 1rem;">
+              <div>
+                <p style="font-size: 0.75rem; color: #666; text-transform: uppercase; font-weight: 600;">Courses Scheduled</p>
+                <p style="font-size: 1.5rem; font-weight: 700; color: #005eb8;">${scheduleCount}</p>
+              </div>
+              <div>
+                <p style="font-size: 0.75rem; color: #666; text-transform: uppercase; font-weight: 600;">Last Import</p>
+                <p style="font-size: 0.875rem; font-weight: 600; color: #333;">${lastImport}</p>
+                ${lastImportName !== 'N/A' ? `<p style="font-size: 0.75rem; color: #666;">From: ${lastImportName}</p>` : ''}
+              </div>
+              <div>
+                <p style="font-size: 0.75rem; color: #666; text-transform: uppercase; font-weight: 600;">Data Persistence</p>
+                <p style="font-size: 0.875rem; font-weight: 600; color: #10b981;">✓ Auto-saved to Browser</p>
+                <p style="font-size: 0.75rem; color: #666;">Schedule persists across sessions</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <h2>📥 Import Excel Schedule</h2>
+            <p style="color: #666; margin-bottom: 1rem;">Upload an Excel file (.xlsx) containing your training schedule.</p>
+
+            <div style="background: #fef3cd; border-left: 4px solid #f59e0b; padding: 1rem; margin-bottom: 1rem; border-radius: 4px;">
+              <p style="color: #92400e; font-size: 0.875rem; margin-bottom: 0.5rem;"><strong>⚠️ Warning:</strong> Importing will REPLACE your current schedule.</p>
+              <p style="color: #92400e; font-size: 0.875rem;">💡 Tip: Export your current schedule first as a backup!</p>
+            </div>
+
+            <p style="font-size: 0.875rem; color: #666; margin-bottom: 0.5rem;"><strong>Supported Column Names:</strong></p>
+            <ul style="font-size: 0.875rem; color: #666; margin-bottom: 1rem; padding-left: 1.5rem;">
+              <li><strong>Core Fields:</strong> WBS, Event Name, Instructors, Month, First Day, Last Day, FY</li>
+              <li><strong>Scheduling:</strong> Time(s), Location, Scheduled (status code)</li>
+              <li><strong>Contacts:</strong> Primary Training Contact</li>
+              <li><strong>Planning:</strong> Duration, FT/PT, Load Planning, Lead Day Of, Lead Post</li>
+              <li><strong>Load:</strong> Load: Total for Training Contact (or Coord Load)</li>
+              <li><strong>Costs:</strong> AU Staff Travel, S/T Travel, Catering, Vendor Cost</li>
+              <li><strong>Optional:</strong> Portfolio, PTS, Special Instructions</li>
+            </ul>
+            <p style="font-size: 0.875rem; color: #666; margin-bottom: 1rem;">
+              <strong>Note:</strong> The app will automatically map your Excel columns. Missing columns will be filled with defaults.
+            </p>
+
+            <input type="file" id="fileInput" accept=".xlsx,.xls" style="margin-bottom: 1rem;">
+
+            <div style="background: #f0f9ff; border: 1px solid #0284c7; padding: 1rem; border-radius: 4px; margin-bottom: 1rem;">
+              <p style="font-size: 0.875rem; font-weight: 600; color: #0369a1; margin-bottom: 0.5rem;">Import Mode:</p>
+              <label style="display: block; margin-bottom: 0.5rem; cursor: pointer;">
+                <input type="radio" name="importMode" value="replace" checked style="margin-right: 0.5rem;">
+                <strong>Replace All</strong> - Delete current schedule and import new data
+              </label>
+              <label style="display: block; cursor: pointer;">
+                <input type="radio" name="importMode" value="append" style="margin-right: 0.5rem;">
+                <strong>Append/Merge</strong> - Add to existing schedule (for consolidating multiple files)
+              </label>
+            </div>
+
+            <button class="btn btn-primary" onclick="App.importExcel()">📥 Import Excel File</button>
+          </div>
+
+          <div class="card">
+            <h2>📤 Export Data</h2>
+
+            <h3 style="margin-top: 1rem; margin-bottom: 0.5rem; font-size: 1rem; color: #005eb8;">Schedule (Courses)</h3>
+            <p style="color: #666; margin-bottom: 1rem; font-size: 0.875rem;">Download your current schedule (${scheduleCount} courses).</p>
+
+            ${scheduleCount === 0 ? `
+              <p style="color: #999; padding: 1rem; background: #f5f5f5; border-radius: 4px; font-size: 0.875rem;">
+                No courses to export. Add courses to your schedule first.
+              </p>
+            ` : `
+              <button class="btn btn-primary" onclick="App.exportExcel()">📤 Export Schedule to Excel</button>
+            `}
+
+            <hr style="margin: 1.5rem 0; border: none; border-top: 1px solid #e0e0e0;">
+
+            <h3 style="margin-bottom: 0.5rem; font-size: 1rem; color: #005eb8;">Course Catalog (Templates)</h3>
+            <p style="color: #666; margin-bottom: 1rem; font-size: 0.875rem;">
+              Download course templates (${this.state.courseCatalog.length} templates).<br>
+              <strong>For instructors:</strong> Export your templates and send to schedule manager.
+            </p>
+
+            ${this.state.courseCatalog.length === 0 ? `
+              <p style="color: #999; padding: 1rem; background: #f5f5f5; border-radius: 4px; font-size: 0.875rem;">
+                No course templates to export. Add templates to the Course Catalog tab first.
+              </p>
+            ` : `
+              <button class="btn btn-primary" onclick="App.exportCourseCatalog()">📚 Export Course Catalog to Excel</button>
+            `}
+          </div>
+
+          <div class="card">
+            <h2>💾 Data Persistence</h2>
+            <p style="color: #666; margin-bottom: 1rem;">Your schedule automatically saves to your browser's local storage.</p>
+
+            <div style="background: #f0f9ff; border-left: 4px solid #005eb8; padding: 1rem; border-radius: 4px;">
+              <p style="color: #003d82; font-size: 0.875rem; margin-bottom: 0.5rem;"><strong>How it works:</strong></p>
+              <ul style="color: #003d82; font-size: 0.875rem; padding-left: 1.5rem; margin: 0;">
+                <li>Every change (add, edit, delete) auto-saves immediately</li>
+                <li>Schedule persists when you close and reopen the browser</li>
+                <li>Data stays on YOUR computer (not uploaded anywhere)</li>
+                <li>Only changes when you import a new file or auto-generate</li>
+              </ul>
+            </div>
+
+            <p style="color: #666; margin-top: 1rem; font-size: 0.875rem;"><strong>Best Practice:</strong> Export your schedule regularly as a backup!</p>
+          </div>
+        `;
+      },
+
+      importExcel() {
+        const fileInput = document.getElementById('fileInput');
+        const file = fileInput.files[0];
+
+        if (!file) {
+          alert('Please select a file first');
+          return;
+        }
+
+        // Get import mode
+        const importMode = document.querySelector('input[name="importMode"]:checked').value;
+
+        // Warn user based on mode
+        if (importMode === 'replace' && this.state.schedule.length > 0) {
+          const action = confirm(
+            `⚠️ REPLACE MODE: You currently have ${this.state.schedule.length} courses scheduled.\n\n` +
+            `Click OK to DELETE current schedule and import new data.\n` +
+            `Click Cancel to abort.\n\n` +
+            `Tip: Use "Append/Merge" mode to add to existing data instead!`
+          );
+
+          if (!action) {
+            fileInput.value = ''; // Clear the file input
+            return;
+          }
+        }
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          try {
+            const data = new Uint8Array(e.target.result);
+            const workbook = XLSX.read(data, { type: 'array' });
+            const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+
+            // First, try reading as array of arrays to find the header row
+            const rawData = XLSX.utils.sheet_to_json(firstSheet, { header: 1, defval: '' });
+
+            console.log('=== RAW EXCEL DATA ===');
+            console.log('First 5 rows:', rawData.slice(0, 5));
+
+            // Find the header row (first row with substantial non-empty values)
+            let headerRowIndex = -1;
+            let headers = [];
+
+            for (let i = 0; i < Math.min(10, rawData.length); i++) {
+              const row = rawData[i];
+              const nonEmptyCount = row.filter(cell => cell && cell !== '').length;
+
+              // If this row has many non-empty cells and looks like headers (contains text like "WBS", "Event", "Instructor")
+              if (nonEmptyCount > 5) {
+                const rowText = row.join(' ').toLowerCase();
+                if (rowText.includes('wbs') || rowText.includes('event') || rowText.includes('instructor') || rowText.includes('month')) {
+                  headerRowIndex = i;
+                  headers = row.map(h => String(h || '').trim());
+                  console.log(`Found header row at index ${i}:`, headers);
+                  break;
+                }
+              }
+            }
+
+            if (headerRowIndex === -1) {
+              alert('❌ Could not find header row in Excel file.\n\nPlease ensure:\n1. The file has a header row with column names\n2. Header row contains text like "WBS", "Event Name", "Instructors", etc.\n3. There are no blank rows above the headers');
+              fileInput.value = '';
+              return;
+            }
+
+            // Now convert to JSON using the detected headers, starting from the row after headers
+            const dataRows = rawData.slice(headerRowIndex + 1).filter(row => {
+              // Filter out empty rows
+              return row.some(cell => cell && cell !== '');
+            });
+
+            // Convert array rows to objects using our detected headers
+            const rows = dataRows.map(row => {
+              const obj = {};
+              headers.forEach((header, idx) => {
+                if (header) {
+                  obj[header] = row[idx] !== undefined ? row[idx] : '';
+                }
+              });
+              return obj;
+            });
+
+            if (rows.length === 0) {
+              alert('❌ No data found in Excel file. Please check the file has data rows.');
+              fileInput.value = '';
+              return;
+            }
+
+            // Show exact column names found
+            const excelColumns = Object.keys(rows[0]);
+            console.log('=== EXCEL IMPORT DEBUG ===');
+            console.log('Total rows found:', rows.length);
+            console.log('Excel columns found:', excelColumns);
+            console.log('First row raw data:', rows[0]);
+            console.log('========================');
+
+            // Show user a mapping dialog
+            const columnPreview = excelColumns.slice(0, 15).join('\n• ');
+            const proceedConfirm = confirm(
+              `Found ${rows.length} rows with ${excelColumns.length} columns.\n\n` +
+              `Excel columns detected:\n• ${columnPreview}${excelColumns.length > 15 ? '\n• ...' : ''}\n\n` +
+              `Click OK to import (check browser console F12 for full details).\n` +
+              `Click Cancel to abort import.`
+            );
+
+            if (!proceedConfirm) {
+              fileInput.value = '';
+              return;
+            }
+
+            // Log first row to help debug column names
+            let debugInfo = '';
+            if (rows.length > 0) {
+              console.log('First row columns:', Object.keys(rows[0]));
+              console.log('First row data sample:', rows[0]);
+              debugInfo = `\n\nColumns found: ${Object.keys(rows[0]).slice(0, 10).join(', ')}${Object.keys(rows[0]).length > 10 ? '...' : ''}`;
+            }
+
+            // Parse rows into schedule with expanded data model
+            const imported = rows.map((row, index) => {
+              // Helper to get value from row with multiple possible column names (case-insensitive, trim spaces)
+              const getVal = (...keys) => {
+                // First try exact match
+                for (let key of keys) {
+                  if (row[key] !== undefined && row[key] !== null && row[key] !== '') {
+                    return row[key];
+                  }
+                }
+                // Then try case-insensitive and trimmed match
+                const rowKeysLower = Object.keys(row).reduce((acc, k) => {
+                  acc[k.toLowerCase().trim()] = row[k];
+                  return acc;
+                }, {});
+
+                for (let key of keys) {
+                  const keyLower = key.toLowerCase().trim();
+                  if (rowKeysLower[keyLower] !== undefined && rowKeysLower[keyLower] !== null && rowKeysLower[keyLower] !== '') {
+                    return rowKeysLower[keyLower];
+                  }
+                }
+                return '';
+              };
+
+              // Parse dates from Excel format
+              const parseExcelDate = (dateVal, monthVal, dayVal) => {
+                if (dateVal && typeof dateVal === 'number') {
+                  // Excel serial date
+                  const excelDate = new Date((dateVal - 25569) * 86400 * 1000);
+                  return dayjs(excelDate).format('YYYY-MM-DD');
+                } else if (monthVal && dayVal) {
+                  // Month + Day format
+                  const fy = getVal('FY', 'Fiscal Year');
+                  const year = fy === 'FY27' || fy === '27' || fy === '2027' ? 2027 : 2028;
+                  const monthNum = this.parseMonth(monthVal);
+                  return dayjs(`${year}-${monthNum}-${dayVal}`).format('YYYY-MM-DD');
+                }
+                return dateVal || '';
+              };
+
+              const firstDay = getVal('First Day', 'FirstDay', 'Start Day');
+              const lastDay = getVal('Last Day', 'LastDay', 'End Day');
+              const month = getVal('Month');
+
+              // Log first row mapping for debugging
+              if (index === 0) {
+                console.log('=== FIRST ROW FIELD MAPPING ===');
+                console.log('courseTitle:', getVal('Event Name', 'EventName', 'Course Title', 'Title', 'Course Name', 'Name'));
+                console.log('wbs:', getVal('WBS', 'Work Breakdown Structure'));
+                console.log('instructors:', getVal('Instructors', 'Instructor', 'Teacher'));
+                console.log('month:', month);
+                console.log('firstDay:', firstDay);
+                console.log('lastDay:', lastDay);
+                console.log('duration:', getVal('Duration', 'Length', 'Days'));
+                console.log('location:', getVal('Location', 'Venue', 'Place'));
+                console.log('coordLoad:', getVal('Load: Total for Training Contact', 'Total for Training Contact', 'Total Load', 'Coord Load', 'Load', 'Hours'));
+                console.log('===============================');
+              }
+
+              return {
+                id: this.uuid(),
+                rowNumber: getVal('#', 'Row', 'Number') || (index + 1),
+                homeCourse: getVal('Home Course', 'HomeCourse'),
+                portfolio: getVal('Portfolio'),
+                wbs: getVal('WBS', 'Work Breakdown Structure'),
+                pts: getVal('PTS', 'Points'),
+                courseRef: getVal('WBS', 'Course Ref', 'Course Reference', 'Code', 'CourseRef'),
+                courseTitle: getVal('Event Name', 'EventName', 'Course Title', 'Title', 'Course Name', 'Name'),
+                instructor: 'inst1', // Default - will need to map
+                instructors: getVal('Instructors', 'Instructor', 'Teacher'),
+                coordinator: 'coord1', // Default - will need to map
+                primaryContact: getVal('Primary Training Contact', 'Training Contact', 'Contact'),
+                month: month,
+                firstDay: firstDay,
+                lastDay: lastDay,
+                startDate: parseExcelDate(getVal('Start Date', 'StartDate', 'Begin Date'), month, firstDay),
+                endDate: parseExcelDate(getVal('End Date', 'EndDate'), month, lastDay),
+                fy: getVal('FY', 'Fiscal Year') || 'FY27',
+                times: getVal('Time(s)', 'Times', 'Time'),
+                location: getVal('Location', 'Venue', 'Place'),
+                locationCode: getVal('Scheduled', 'Status Code', 'Code') || 'N',
+                scheduled: getVal('Scheduled', 'Status Code') || 'N',
+                specialInstructions: getVal('Special Instructions', 'Instructions', 'Notes'),
+                duration: parseFloat(getVal('Duration', 'Length', 'Days') || 0),
+                ftpt: getVal('FT/PT', 'FTPT', 'Type') || 'FT',
+                loadPlanningLeadUp: parseFloat(getVal('Load Planning', 'Lead Up', 'LeadUp') || 0),
+                loadPlanningDayOf: parseFloat(getVal('Lead Day Of', 'Day Of', 'DayOf') || 0),
+                loadPlanningPost: parseFloat(getVal('Lead Post', 'Post') || 0),
+                coordLoad: parseFloat(getVal('Load: Total for Training Contact', 'Total for Training Contact', 'Total Load', 'Coord Load', 'Load', 'Hours') || 0),
+                auStaffTravel: parseFloat(getVal('AU Staff Travel', 'Staff Travel') || 0),
+                stTravel: parseFloat(getVal('S/T Travel', 'ST Travel', 'Travel') || 0),
+                catering: parseFloat(getVal('Catering') || 0),
+                vendorCost: parseFloat(getVal('Vendor Cost', 'VendorCost', 'Vendor') || 0),
+                status: getVal('Status') || 'Scheduled'
+              };
+            });
+
+            // Apply import mode: replace or append
+            const importMode = document.querySelector('input[name="importMode"]:checked').value;
+            const previousCount = this.state.schedule.length;
+
+            if (importMode === 'append') {
+              // Append new courses to existing schedule
+              this.state.schedule = [...this.state.schedule, ...imported];
+            } else {
+              // Replace entire schedule
+              this.state.schedule = imported;
+            }
+
+            const newCount = this.state.schedule.length;
+
+            // Save to localStorage
+            this.saveState();
+
+            // Update metadata
+            this.state.meta.lastImport = new Date().toISOString();
+            this.state.meta.lastImportName = file.name;
+            this.saveState();
+
+            // Auto-recalculate rules after import
+            this.runRulesEngine();
+
+            // Show detailed import results
+            const sampleCourse = imported[0] || {};
+            const populatedFields = Object.entries(sampleCourse)
+              .filter(([key, value]) => value && value !== '' && key !== 'id')
+              .map(([key]) => key);
+
+            console.log('Sample imported course:', sampleCourse);
+            console.log('Populated fields:', populatedFields);
+
+            const modeMessage = importMode === 'append'
+              ? `Added ${imported.length} courses to existing ${previousCount} courses.\nTotal now: ${newCount} courses.`
+              : `Replaced schedule with ${imported.length} courses.`;
+
+            alert(
+              `✓ Successfully imported from ${file.name}!\n\n` +
+              `${modeMessage}${debugInfo}\n\n` +
+              `Fields with data (first course): ${populatedFields.slice(0, 8).join(', ')}${populatedFields.length > 8 ? '...' : ''}\n\n` +
+              `Next steps:\n` +
+              `1. Check Schedule tab to review\n` +
+              `2. Press F12 and check Console for full details\n` +
+              `3. Check Dashboard for warnings`
+            );
+            this.switchTab('schedule');
+
+            // Clear file input for next import
+            fileInput.value = '';
+          } catch (err) {
+            console.error('Import error:', err);
+            alert('❌ Failed to import file. Please check the format.\n\nSupported columns:\n- Course Ref/Code\n- Course Title/Name\n- Start Date\n- End Date\n- Coord Load/Hours\n- Status (optional)');
+          }
+        };
+
+        reader.readAsArrayBuffer(file);
+      },
+
+      exportExcel() {
+        const data = this.state.schedule.map(course => {
+          const instructor = this.state.instructors.find(i => i.id === course.instructor);
+          const coordinator = this.state.coordinators.find(c => c.id === course.coordinator);
+          return {
+            '#': course.rowNumber || '',
+            'Home Course': course.homeCourse || '',
+            'Portfolio': course.portfolio || '',
+            'WBS': course.wbs || course.courseRef || '',
+            'PTS': course.pts || '',
+            'Event Name': course.courseTitle,
+            'Instructors': course.instructors || (instructor ? instructor.name : ''),
+            'Month': course.month || '',
+            'First Day': course.firstDay || '',
+            'Last Day': course.lastDay || '',
+            'FY': course.fy || 'FY27',
+            'Time(s)': course.times || '',
+            'Location': course.location || '',
+            'Scheduled': course.scheduled || course.locationCode || '',
+            'Primary Training Contact': course.primaryContact || (coordinator ? coordinator.name : ''),
+            'Special Instructions': course.specialInstructions || '',
+            'Duration': course.duration || '',
+            'FT/PT': course.ftpt || '',
+            'Load Planning': course.loadPlanningLeadUp || '',
+            'Lead Day Of': course.loadPlanningDayOf || '',
+            'Lead Post': course.loadPlanningPost || '',
+            'Load: Total for Training Contact': course.coordLoad || '',
+            'AU Staff Travel': course.auStaffTravel || '',
+            'S/T Travel': course.stTravel || '',
+            'Catering': course.catering || '',
+            'Vendor Cost': course.vendorCost || ''
+          };
+        });
+
+        const ws = XLSX.utils.json_to_sheet(data);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Schedule');
+        XLSX.writeFile(wb, 'AU_Schedule.xlsx');
+      },
+
+      exportCourseCatalog() {
+        const data = this.state.courseCatalog.map(template => {
+          return {
+            'Instructor Name': template.instructorName || '',
+            'Preferred Coordinator': template.coordinatorName || '',
+            'WBS': template.wbs || template.courseRef || '',
+            'Event Name': template.courseTitle,
+            'Portfolio': template.portfolio || '',
+            'PTS': template.pts || '',
+            'Sessions Per Year': template.sessionsPerYear,
+            'Average Total Load': template.avgCoordLoad,
+            'Duration (days)': template.durationDays,
+            'FT/PT': template.ftpt || '',
+            'Load Planning Lead Up': template.loadPlanningLeadUp || '',
+            'Load Planning Day Of': template.loadPlanningDayOf || '',
+            'Load Planning Post': template.loadPlanningPost || '',
+            'Default Location': template.location || '',
+            'Preferred Months': template.preferredMonths || '',
+            'Notes': template.notes || ''
+          };
+        });
+
+        const ws = XLSX.utils.json_to_sheet(data);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Course Catalog');
+
+        // Auto-generate filename with timestamp
+        const timestamp = new Date().toISOString().slice(0,10);
+        XLSX.writeFile(wb, `AU_Course_Catalog_${timestamp}.xlsx`);
+
+        alert(`✓ Exported ${data.length} course templates!\n\nFilename: AU_Course_Catalog_${timestamp}.xlsx\n\nSend this file to your schedule manager.`);
+      },
+
+      // Settings
+      renderSettings() {
+        const content = document.getElementById('content');
+        content.innerHTML = `
+          <div class="card">
+            <h2>⚙️ Application Settings</h2>
+
+            <h3 style="margin-top: 1.5rem; margin-bottom: 1rem; font-size: 1rem; color: #667eea;">About AU Scheduler</h3>
+            <p style="color: #666; margin-bottom: 0.5rem;"><strong>Version:</strong> ${this.version}</p>
+            <p style="color: #666; margin-bottom: 1rem;"><strong>Purpose:</strong> Training coordination and resource planning for Aerospace University</p>
+
+            <h3 style="margin-top: 2rem; margin-bottom: 1rem; font-size: 1rem; color: #667eea;">FY27 Planning Goals</h3>
+            <ul style="color: #666; padding-left: 1.5rem; margin-bottom: 1rem;">
+              <li>Baseline Capacity: 200 hrs/month (3 specialists × 60 hrs + 20 hrs admin pool)</li>
+              <li>Target Efficiency Gain: 15% through automation & process improvements</li>
+              <li>Average Coordination Load Target: 6 hrs/course (down from 8 hrs)</li>
+              <li>ISD Support Available: 20 hrs/month for gap coverage</li>
+            </ul>
+
+            <hr style="margin: 2rem 0; border: none; border-top: 1px solid #e0e0e0;">
+
+            <h3 style="margin-bottom: 1rem; font-size: 1rem; color: #667eea;">Schedule Protection</h3>
+            <div style="background: ${this.state.settings.scheduleLocked ? '#fee' : '#f0f9ff'}; border: 2px solid ${this.state.settings.scheduleLocked ? '#ef4444' : '#0284c7'}; padding: 1.5rem; border-radius: 8px; margin-bottom: 2rem;">
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
+                <div>
+                  <p style="font-weight: 600; color: ${this.state.settings.scheduleLocked ? '#991b1b' : '#0369a1'}; margin-bottom: 0.5rem;">
+                    ${this.state.settings.scheduleLocked ? '🔒 Schedule is LOCKED' : '🔓 Schedule is UNLOCKED'}
+                  </p>
+                  <p style="font-size: 0.875rem; color: #666;">
+                    ${this.state.settings.scheduleLocked
+                      ? 'Auto-generation is disabled. You can still manually add/edit/delete courses.'
+                      : 'Auto-generation is enabled. Lock schedule after finalization to prevent accidental regeneration.'}
+                  </p>
+                </div>
+                <button
+                  class="btn ${this.state.settings.scheduleLocked ? 'btn-danger' : 'btn-primary'}"
+                  onclick="App.toggleScheduleLock()"
+                  style="white-space: nowrap;"
+                >
+                  ${this.state.settings.scheduleLocked ? '🔓 Unlock Schedule' : '🔒 Lock Schedule'}
+                </button>
+              </div>
+              <p style="font-size: 0.75rem; color: #666; margin: 0;">
+                <strong>Best Practice:</strong> Lock schedule after finalizing annual FY plan. Unlock only when you need to regenerate the entire schedule (typically once per year).
+              </p>
+            </div>
+
+            <hr style="margin: 2rem 0; border: none; border-top: 1px solid #e0e0e0;">
+
+            <h3 style="margin-bottom: 1rem; font-size: 1rem; color: #f59e0b;">Data Management</h3>
+            <button class="btn btn-secondary" onclick="App.clearScheduleOnly()" style="background: #f59e0b; color: white;">Clear Schedule Only</button>
+            <p style="color: #666; font-size: 0.75rem; margin-top: 0.5rem; margin-bottom: 2rem;">Remove all scheduled courses but keep coordinators, instructors, catalog templates, and rules.</p>
+
+            <h3 style="margin-bottom: 1rem; font-size: 1rem; color: #ef4444;">⚠️ Danger Zone</h3>
+            <div style="background: #fee; border: 2px solid #ef4444; padding: 1.5rem; border-radius: 8px;">
+              <p style="color: #991b1b; font-weight: 600; margin-bottom: 1rem;">⚠️ WARNING: This action is IRREVERSIBLE!</p>
+              <p style="color: #991b1b; font-size: 0.875rem; margin-bottom: 1rem;">
+                Resetting will permanently delete:<br>
+                • All scheduled courses<br>
+                • All coordinators and instructors<br>
+                • All course catalog templates<br>
+                • All rules (blackout dates, dependencies, restrictions)<br>
+                • All settings and preferences
+              </p>
+              <p style="color: #991b1b; font-size: 0.875rem; margin-bottom: 1rem;">
+                <strong>Recommendation:</strong> Export your schedule and catalog data before resetting!
+              </p>
+              <button class="btn btn-danger" onclick="App.resetState()">Reset All Data (Cannot Be Undone)</button>
+            </div>
+          </div>
+        `;
+      },
+
+      addInstructor() {
+        this.openDrawer({
+          title: 'Add Instructor',
+          fields: {
+            name: { label: 'Name', type: 'text', required: true },
+            department: { label: 'Department', type: 'text', required: true },
+            capacity: { label: 'Monthly Capacity (hours)', type: 'number', value: 40, required: true }
+          },
+          onSave: (data) => {
+            const newInst = {
+              id: this.uuid(),
+              ...data
+            };
+            this.state.instructors.push(newInst);
+            this.saveState();
+            this.switchTab('people');
+          }
+        });
+      },
+
+      deleteInstructor(id) {
+        if (confirm('Delete this instructor?')) {
+          this.state.instructors = this.state.instructors.filter(i => i.id !== id);
+          this.saveState();
+          this.switchTab('people');
+        }
+      },
+
+      // Rules Engine
+      runRulesEngine() {
+        const warnings = [];
+
+        // Calculate load per coordinator per month
+        const coordLoads = {};
+
+        this.state.schedule.forEach(course => {
+          if (course.status === 'Cancelled') return;
+
+          const coordId = course.coordinator;
+          if (!coordId) return;
+
+          const coord = this.state.coordinators.find(c => c.id === coordId);
+          if (!coord) return;
+
+          // Simplified: just add to total load
+          if (!coordLoads[coordId]) {
+            coordLoads[coordId] = 0;
+          }
+          coordLoads[coordId] += course.coordLoad || 0;
+        });
+
+        // Check for overload
+        for (const [coordId, load] of Object.entries(coordLoads)) {
+          const coord = this.state.coordinators.find(c => c.id === coordId);
+          if (!coord) continue;
+
+          const adjustedCap = coord.capacity * (1 - this.state.rules.globalReduction);
+
+          if (load > adjustedCap) {
+            warnings.push({
+              type: 'Overload',
+              severity: 'high',
+              message: `${coord.name} is overloaded: ${load} hours assigned vs ${Math.round(adjustedCap)} hour capacity (after ${this.state.rules.globalReduction * 100}% efficiency gain)`
+            });
+          } else if (load > adjustedCap * 0.8) {
+            warnings.push({
+              type: 'Near Capacity',
+              severity: 'medium',
+              message: `${coord.name} is near capacity: ${load} hours assigned vs ${Math.round(adjustedCap)} hour capacity`
+            });
+          }
+        }
+
+        this.state.warnings = warnings;
+        this.saveState();
+      },
+
+      // Drawer System
+      setupDrawer() {
+        const overlay = document.getElementById('drawerOverlay');
+        const panel = document.getElementById('drawerPanel');
+
+        overlay.addEventListener('click', () => this.closeDrawer());
+
+        document.addEventListener('keydown', (e) => {
+          if (e.key === 'Escape') this.closeDrawer();
+        });
+      },
+
+      openDrawer({ title, fields, onSave }) {
+        const panel = document.getElementById('drawerPanel');
+        const overlay = document.getElementById('drawerOverlay');
+
+        let fieldsHTML = '';
+        for (const [key, field] of Object.entries(fields)) {
+          fieldsHTML += `
+            <div class="form-group">
+              <label class="form-label">${field.label}${field.required ? ' *' : ''}</label>
+              ${field.type === 'select' ? `
+                <select class="form-select" name="${key}" ${field.required ? 'required' : ''}>
+                  <option value="">Select...</option>
+                  ${field.options.map(opt => `
+                    <option value="${opt.value}" ${field.value === opt.value ? 'selected' : ''}>${opt.label}</option>
+                  `).join('')}
+                </select>
+              ` : `
+                <input type="${field.type}"
+                       class="form-input"
+                       name="${key}"
+                       value="${field.value || ''}"
+                       ${field.required ? 'required' : ''}>
+              `}
+            </div>
+          `;
+        }
+
+        panel.innerHTML = `
+          <div class="drawer-header">
+            <h2>${title}</h2>
+            <button class="drawer-close" onclick="App.closeDrawer()">&times;</button>
+          </div>
+          <div class="drawer-body">
+            <form id="drawerForm">
+              ${fieldsHTML}
+            </form>
+          </div>
+          <div class="drawer-footer">
+            <button class="btn btn-secondary" onclick="App.closeDrawer()">Cancel</button>
+            <button class="btn btn-primary" onclick="App.saveDrawer()">Save</button>
+          </div>
+        `;
+
+        // Store callback
+        this.drawerCallback = onSave;
+
+        // Show drawer
+        overlay.classList.add('open');
+        panel.classList.add('open');
+      },
+
+      saveDrawer() {
+        const form = document.getElementById('drawerForm');
+        const formData = new FormData(form);
+        const data = {};
+
+        for (const [key, value] of formData.entries()) {
+          const input = form.elements[key];
+          if (input.type === 'number') {
+            data[key] = parseFloat(value);
+          } else {
+            data[key] = value;
+          }
+        }
+
+        // Validate
+        const requiredFields = form.querySelectorAll('[required]');
+        for (const field of requiredFields) {
+          if (!field.value) {
+            alert(`Please fill in: ${field.name}`);
+            return;
+          }
+        }
+
+        // Call save callback
+        if (this.drawerCallback) {
+          this.drawerCallback(data);
+        }
+
+        this.closeDrawer();
+      },
+
+      closeDrawer() {
+        const panel = document.getElementById('drawerPanel');
+        const overlay = document.getElementById('drawerOverlay');
+
+        panel.classList.remove('open');
+        overlay.classList.remove('open');
+
+        this.drawerCallback = null;
+      },
+
+      // Utilities
+      uuid() {
+        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+          const r = Math.random() * 16 | 0;
+          const v = c === 'x' ? r : (r & 0x3 | 0x8);
+          return v.toString(16);
+        });
+      },
+
+      formatDate(dateStr) {
+        if (!dateStr) return '';
+        return dayjs(dateStr).format('MMM D, YYYY');
+      },
+
+      getUpcomingMonths(count) {
+        const months = [];
+        for (let i = 0; i < count; i++) {
+          months.push(dayjs().add(i, 'month').format('YYYY-MM'));
+        }
+        return months;
+      },
+
+      parseMonth(monthStr) {
+        const months = {
+          'JAN': '01', 'FEB': '02', 'MAR': '03', 'APR': '04',
+          'MAY': '05', 'JUN': '06', 'JUL': '07', 'AUG': '08',
+          'SEP': '09', 'OCT': '10', 'NOV': '11', 'DEC': '12'
+        };
+        return months[monthStr?.toUpperCase()] || '01';
+      },
+
+      getLocationColor(code) {
+        // Based on the color codes from the Excel file
+        const colors = {
+          'N': '#e3f2fd',      // Light blue - Waiting on Instructor
+          'Y': '#c8e6c9',      // Light green - Course scheduled
+          'C': '#ffcdd2',      // Light red - Cancelled
+          'H': '#fff9c4',      // Light yellow - Hold
+          'T': '#ffe0b2',      // Light orange - Tentative
+          'Virtual': '#e1bee7', // Light purple
+          'El Segundo': '#b2dfdb',
+          'Chantilly': '#fff59d',
+          'Colorado Springs': '#ffccbc'
+        };
+        return colors[code] || colors[code?.charAt(0)] || '#f5f5f5';
+      }
+    };
+
+    // Initialize when DOM is ready
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', () => App.init());
+    } else {
+      App.init();
+    }
+  </script>
+</body>
+</html>
